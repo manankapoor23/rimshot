@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg"><strong>Download Rimshot for Mac</strong></a>
-  &nbsp;·&nbsp; free &nbsp;·&nbsp; macOS 13 or later &nbsp;·&nbsp; <a href="https://manankapoor23.github.io/rimshot/">website</a>
+  &nbsp;·&nbsp; free &nbsp;·&nbsp; macOS 13 or later &nbsp;·&nbsp; <a href="https://mkap.me/rimshot/">website</a>
 </p>
 
 Apple retired the Touch Bar, but the shortcuts were handy. Rimshot brings them back to every MacBook, including the ones that never had one.
