@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rimshot · The Touch Bar, back on your trackpad</title>
+<meta name="description" content="Rest a finger on the top edge of your MacBook trackpad and a Touch Bar appears on screen. Free, open source, 540 KB.">
+<meta property="og:title" content="Rimshot · The Touch Bar, back on your trackpad">
+<meta property="og:description" content="Rest a finger on the top edge of your trackpad and a Touch Bar appears on screen. Slide to pick, feel a tick, lift to press.">
+<meta property="og:image" content="https://manankapoor23.github.io/rimshot/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='14' fill='%231b1d22'/%3E%3Crect x='14' y='17' width='36' height='3' rx='1.5' fill='%23f2f2f2'/%3E%3Ccircle cx='38' cy='18.5' r='4.5' fill='%230a6cff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --ink: #151515;
+    --ink-2: #4b4b4b;
+    --ink-3: #767676;
+    --line: #e7e7e5;
+    --pad: #f1f1ef;
+    --pad-edge: #e3e3e0;
+    --selected: #0a6cff;         /* the highlighted button, as in the app */
+    --screen: #1b1d22;
+    --screen-ink: #e9e9ea;
+    --hud: #2b2e35;
+    --key: rgba(255, 255, 255, 0.07);
+    --code-bg: #f4f4f2;
+    --serif: "Newsreader", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121212;
+      --ink: #f1f1f0;
+      --ink-2: #b9b9b6;
+      --ink-3: #8d8d8a;
+      --line: #2a2a29;
+      --pad: #1d1d1f;
+      --pad-edge: #2a2a2d;
+      --screen: #0c0d10;
+      --hud: #24272e;
+      --code-bg: #1b1b1b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121212; --ink: #f1f1f0; --ink-2: #b9b9b6; --ink-3: #8d8d8a; --line: #2a2a29;
+    --pad: #1d1d1f; --pad-edge: #2a2a2d; --screen: #0c0d10; --hud: #24272e; --code-bg: #1b1b1b;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 17px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { text-decoration-thickness: 2px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  @media (max-width: 520px) { .wrap { padding: 0 16px; } }
+
+  /* Header */
+  header { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .mark { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 500 22px/1 var(--serif); }
+  .mark svg { width: 26px; height: 26px; }
+  nav { display: flex; gap: 22px; font-size: 15px; }
+  nav a { text-decoration: none; color: var(--ink-2); }
+  nav a:hover { color: var(--ink); }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: center; padding: 48px 0 88px; }
+  @media (max-width: 900px) { .hero { grid-template-columns: minmax(0, 1fr); gap: 40px; padding-top: 24px; } }
+  .hero > *, .split > * { min-width: 0; }
+  h1 {
+    font: 400 clamp(40px, 5.4vw, 64px)/1.04 var(--serif);
+    letter-spacing: -0.015em;
+    margin: 0 0 22px;
+  }
+  .lede { font-size: 19px; color: var(--ink-2); margin: 0 0 32px; max-width: 30em; }
+  .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; }
+  .button {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--ink); color: var(--bg);
+    padding: 13px 20px; border-radius: 10px;
+    font-weight: 600; font-size: 16px; text-decoration: none;
+  }
+  .button:hover { opacity: 0.88; }
+  .button svg { width: 16px; height: 16px; }
+  .meta { font-size: 14px; color: var(--ink-3); }
+  .note { font-size: 14px; color: var(--ink-3); margin-top: 18px; max-width: 30em; }
+
+  /* Demo */
+  .demo { user-select: none; -webkit-user-select: none; }
+  .screen {
+    position: relative; background: var(--screen); border-radius: 14px;
+    aspect-ratio: 16 / 9.4; overflow: hidden;
+  }
+  .window { position: absolute; left: 7%; top: 10%; width: 46%; height: 44%; border-radius: 8px; background: rgba(255,255,255,0.05); }
+  .window::before { content: ""; position: absolute; inset: 0 0 auto; height: 15%; border-radius: 8px 8px 0 0; background: rgba(255,255,255,0.05); }
+  .window.two { left: 58%; top: 18%; width: 34%; height: 33%; }
+  .status {
+    position: absolute; left: 0; right: 0; bottom: 30%; text-align: center;
+    color: var(--screen-ink); font-size: 14px; opacity: 0.75; padding: 0 16px;
+    transition: opacity 0.2s;
+  }
+  .status strong { font-weight: 600; opacity: 1; }
+  .bar {
+    position: absolute; left: 4%; right: 4%; bottom: 7%;
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+    padding: 7px; border-radius: 13px; background: var(--hud);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    opacity: 0; transform: scale(0.94); transform-origin: 50% 100%;
+    transition: opacity 0.14s ease-out, transform 0.18s ease-out;
+  }
+  .bar.fn { grid-template-columns: repeat(13, 1fr); gap: 4px; }
+  .bar.visible { opacity: 1; transform: none; }
+  .key {
+    position: relative; height: 40px; border-radius: 8px; background: var(--key);
+    display: grid; place-items: center; color: var(--screen-ink); overflow: hidden;
+    font: 500 13px var(--mono);
+  }
+  .bar.fn .key { font-size: 11px; height: 36px; }
+  .key svg { width: 20px; height: 20px; position: relative; }
+  .key span { position: relative; }
+  .key.selected { background: var(--selected); color: #fff; }
+  /* The hold charges as a glow growing from the middle of the button. */
+  .key::after {
+    content: ""; position: absolute; inset: 0; margin: auto; border-radius: 8px;
+    background: rgba(255,255,255,0.32);
+    transform: scale(var(--charge, 0)); opacity: calc(0.4 + var(--charge, 0) * 0.6);
+  }
+  .key.pressed { animation: press 0.32s ease-out; }
+  @keyframes press { 40% { transform: scale(0.92); } }
+  .bar.cancelling .key { opacity: 0.35; }
+  .bar.cancelling .key.selected { background: var(--key); color: var(--screen-ink); }
+  .slider {
+    position: absolute; inset: 7px; display: none; align-items: center; gap: 14px;
+    padding: 0 14px; border-radius: 8px; background: rgba(10,108,255,0.28); color: var(--screen-ink);
+    font-size: 14px; font-weight: 600;
+  }
+  .slider svg { width: 20px; height: 20px; flex: none; }
+  .track { position: relative; flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.22); }
+  .knob { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--selected); left: 50%; }
+  .bar.sliding .key { visibility: hidden; }
+  .bar.sliding .slider { display: flex; }
+
+  .pad-row { display: flex; align-items: flex-start; gap: 18px; margin-top: 22px; }
+  .pad {
+    position: relative; width: 62%; margin-left: 19%; aspect-ratio: 1.645;
+    background: var(--pad); border-radius: 14px; border: 1px solid var(--pad-edge);
+    touch-action: none; cursor: default;
+  }
+  .edge {
+    position: absolute; left: 0; right: 0; top: 0; height: 18%;
+    border-radius: 13px 13px 0 0; border-bottom: 1px dashed var(--pad-edge);
+    transition: background 0.15s;
+  }
+  .pad.near .edge, .pad.active .edge { background: color-mix(in srgb, var(--selected) 12%, transparent); }
+  .finger {
+    position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+    background: color-mix(in srgb, var(--ink) 18%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+    pointer-events: none; opacity: 0; transition: opacity 0.12s;
+  }
+  .pad.touching .finger { opacity: 1; }
+  .pad-label { font-size: 13px; color: var(--ink-3); margin-top: 2px; line-height: 1.4; }
+  .demo-controls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 16px; font-size: 13px; color: var(--ink-3); }
+  .fn-toggle {
+    font: 500 12px var(--mono); padding: 4px 9px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-2);
+  }
+  .fn-toggle[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  /* Sections */
+  section { border-top: 1px solid var(--line); padding: 72px 0; }
+  .split { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 56px; }
+  @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); gap: 24px; } section { padding: 56px 0; } }
+  h2 { font: 400 clamp(28px, 3.2vw, 38px)/1.12 var(--serif); letter-spacing: -0.01em; margin: 0 0 14px; }
+  h3 { font: 500 22px/1.25 var(--serif); margin: 0 0 6px; }
+  .split p { margin: 0 0 16px; color: var(--ink-2); max-width: 34em; }
+  .statement { font: 400 clamp(26px, 3vw, 36px)/1.3 var(--serif); letter-spacing: -0.01em; max-width: 24em; margin: 0; }
+  .statement + p { color: var(--ink-2); margin: 22px 0 0; max-width: 36em; }
+
+  .steps { margin: 0; }
+  .steps div { display: grid; grid-template-columns: 7.5rem 1fr; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .steps div:first-child { padding-top: 4px; }
+  .steps dt { font: 500 22px/1.3 var(--serif); }
+  .steps dd { margin: 0; color: var(--ink-2); }
+  @media (max-width: 520px) { .steps div { grid-template-columns: 1fr; gap: 2px; } }
+
+  .buttons { list-style: none; margin: 0; padding: 0; max-width: 34rem; }
+  .buttons li { display: flex; align-items: baseline; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .buttons svg { width: 19px; height: 19px; flex: none; position: relative; top: 3px; color: var(--ink); }
+  .buttons .esc { font: 500 12px var(--mono); width: 19px; flex: none; }
+  .buttons b { font-weight: 600; }
+  .buttons small { color: var(--ink-3); font-size: 14px; margin-left: auto; text-align: right; }
+  .split .fkeys { display: flex; flex-wrap: wrap; gap: 5px; margin: 26px 0 0; align-items: center; color: var(--ink-2); font-size: 15px; }
+  kbd, .cap {
+    font: 500 12px var(--mono); padding: 3px 7px; border-radius: 5px;
+    border: 1px solid var(--line); border-bottom-width: 2px; background: var(--bg); color: var(--ink);
+  }
+
+  ol.install { margin: 0; padding-left: 1.3em; color: var(--ink-2); }
+  ol.install li { padding: 6px 0 6px 6px; }
+  ol.install li::marker { font-family: var(--serif); color: var(--ink); }
+  ol.install b { color: var(--ink); font-weight: 600; }
+  pre {
+    margin: 14px 0 0; padding: 14px 16px; border-radius: 10px; background: var(--code-bg);
+    font: 13.5px/1.6 var(--mono); overflow-x: auto; color: var(--ink);
+  }
+  details { margin-top: 26px; color: var(--ink-2); }
+  summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+
+  .faq h3 { font-size: 20px; margin-top: 26px; }
+  .faq h3:first-child { margin-top: 0; }
+  .faq p { margin: 0; }
+
+  footer { border-top: 1px solid var(--line); padding: 64px 0 48px; }
+  .closing { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
+  .closing h2 { margin: 0; }
+  .fine { margin-top: 48px; font-size: 13px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bar, .edge, .finger, .status { transition: none; }
+    .key.pressed { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-sun" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+      <circle cx="10" cy="10" r="3.2"/>
+      <path d="M10 4.2V2.2M15.8 10h2M10 15.8v2M4.2 10h-2M14.1 5.9l1.4-1.4M14.1 14.1l1.4 1.4M5.9 14.1l-1.4 1.4M5.9 5.9 4.5 4.5"/>
+    </symbol>
+    <symbol id="i-kbd" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2.5" y="9.5" width="15" height="8" rx="1.6"/>
+      <path d="M5.6 12.4h.01M8.6 12.4h.01M11.4 12.4h.01M14.4 12.4h.01M7 15h6" stroke-width="1.7"/>
+      <path d="M10 6.6V4.4M6.3 7.2 5.3 5.5M13.7 7.2l1-1.7"/>
+    </symbol>
+    <symbol id="i-mission" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+      <rect x="2.5" y="4" width="6.5" height="5" rx="1.1"/>
+      <rect x="11" y="4" width="6.5" height="5" rx="1.1"/>
+      <rect x="5.5" y="11.5" width="9" height="5" rx="1.1"/>
+    </symbol>
+    <symbol id="i-shot" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7V4h3M14 4h3v3M17 13v3h-3M6 16H3v-3"/>
+      <circle cx="10" cy="10" r="2.3"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M3.5 5.3 9.8 10l-6.3 4.7z"/>
+      <rect x="12" y="5.3" width="1.9" height="9.4" rx="0.6"/>
+      <rect x="15.6" y="5.3" width="1.9" height="9.4" rx="0.6"/>
+    </symbol>
+    <symbol id="i-vol" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 8h3l4-3.5v11L6 12H3z"/>
+      <path d="M13 7.5a3.5 3.5 0 0 1 0 5M15.5 5.3a6.5 6.5 0 0 1 0 9.4"/>
+    </symbol>
+    <symbol id="i-mute" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 8h3l4-3.5v11L6 12H3z"/>
+      <path d="m13.5 7.5 4 5M17.5 7.5l-4 5"/>
+    </symbol>
+    <symbol id="i-down" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header>
+    <a class="mark" href="./">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#1b1d22"/><rect x="14" y="17" width="36" height="3" rx="1.5" fill="#f2f2f2"/><circle cx="38" cy="18.5" r="4.5" fill="#0a6cff"/></svg>
+      Rimshot
+    </a>
+    <nav>
+      <a href="#install">Install</a>
+      <a href="https://github.com/manankapoor23/rimshot">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <h1>The Touch Bar is back, on your trackpad.</h1>
+        <p class="lede">Rest a finger on the top edge of your trackpad and a row of buttons appears on screen. Slide to pick one, feel a tick as you cross each, and lift to press. Your eyes never leave your work.</p>
+        <div class="cta">
+          <a class="button" href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg">
+            <svg aria-hidden="true"><use href="#i-down"/></svg>Download for Mac
+          </a>
+          <span class="meta">Free · v0.1.0 · macOS 13 or later</span>
+        </div>
+        <p class="note">Rimshot isn't notarized by Apple yet, so macOS asks you to approve it once. <a href="#install">Here's how.</a></p>
+      </div>
+
+      <div class="demo" id="demo">
+        <div class="screen" aria-hidden="true">
+          <div class="window"></div>
+          <div class="window two"></div>
+          <p class="status" id="status">Hover the top edge of the trackpad below.</p>
+          <div class="bar" id="bar">
+            <div class="slider" id="slider">
+              <svg id="slider-icon"><use href="#i-sun"/></svg>
+              <span id="slider-name">Brightness</span>
+              <div class="track"><div class="knob" id="knob"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="pad-row">
+          <div class="pad" id="pad" role="img" aria-label="A MacBook trackpad. Resting on its top edge shows the Touch Bar above.">
+            <div class="edge"></div>
+            <div class="finger" id="finger"></div>
+          </div>
+        </div>
+        <div class="demo-controls">
+          <span id="demo-hint">Click to press. Hold the mouse button to charge.</span>
+          <button class="fn-toggle" id="fn" type="button" aria-pressed="false" title="Show the function keys, like holding fn">fn</button>
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <div>
+        <p class="statement">The Touch Bar had good ideas and one real flaw: it was flat glass, so you had to look down to use it.</p>
+        <p>Rimshot moves the buttons to the screen, right where you're already looking, and puts the control under your finger, where you can feel it. It works on every MacBook with macOS 13 or later, including the Airs that never had a Touch Bar.</p>
+      </div>
+    </section>
+
+    <section class="split">
+      <div>
+        <h2>How it feels</h2>
+        <p>Only a resting finger on the top edge opens the bar. Moving the cursor, scrolling and clicking everywhere else work exactly as they always have.</p>
+      </div>
+      <dl class="steps">
+        <div><dt>Rest</dt><dd>Leave a finger on the top edge for a moment. The bar fades in at the bottom of your screen.</dd></div>
+        <div><dt>Slide</dt><dd>The highlight follows your finger across the full width of the trackpad, with a haptic tick on each new button.</dd></div>
+        <div><dt>Lift</dt><dd>Lift to press the highlighted button, or press down on the trackpad to fire it right away.</dd></div>
+        <div><dt>Hold</dt><dd>Stay put and the ticks come faster and firmer while the button glows from its center outward. Then it fires on its own. On brightness, keyboard light and volume, it becomes a slider.</dd></div>
+        <div><dt>Let go</dt><dd>Changed your mind? Slide down into the trackpad and lift. Nothing happens.</dd></div>
+      </dl>
+    </section>
+
+    <section class="split">
+      <div>
+        <h2>On the bar</h2>
+        <p>Eight buttons, the ones people reached for most on the original Touch Bar.</p>
+      </div>
+      <div>
+        <ul class="buttons">
+          <li><span class="esc">esc</span><b>Escape</b><small>the key the Touch Bar took away</small></li>
+          <li><svg><use href="#i-sun"/></svg><b>Brightness</b><small>hold, then slide</small></li>
+          <li><svg><use href="#i-kbd"/></svg><b>Keyboard light</b><small>hold, then slide</small></li>
+          <li><svg><use href="#i-mission"/></svg><b>Mission Control</b><small>every window at once</small></li>
+          <li><svg><use href="#i-shot"/></svg><b>Screenshot</b><small>opens the capture tool</small></li>
+          <li><svg><use href="#i-play"/></svg><b>Play / Pause</b><small>whatever's playing</small></li>
+          <li><svg><use href="#i-vol"/></svg><b>Volume</b><small>hold, then slide</small></li>
+          <li><svg><use href="#i-mute"/></svg><b>Mute</b><small>and unmute</small></li>
+        </ul>
+        <p class="fkeys">Hold <kbd>fn</kbd> and the bar turns into
+          <span class="cap">esc</span><span class="cap">F1</span><span class="cap">F2</span><span class="cap">F3</span><span class="cap">…</span><span class="cap">F12</span>
+        </p>
+      </div>
+    </section>
+
+    <section class="split">
+      <div>
+        <h2>Small on purpose</h2>
+      </div>
+      <div>
+        <p>Rimshot is 540 KB, smaller than a screenshot of it. It's written in Swift with AppKit, so there's no web view and no Electron, and it uses no CPU until you touch the trackpad.</p>
+        <p>It needs Accessibility permission to press keys for you, so you should be able to see exactly what it does. The whole app is one file of Swift, <a href="https://github.com/manankapoor23/rimshot/blob/main/main.swift">right here</a>. MIT licensed.</p>
+      </div>
+    </section>
+
+    <section class="split" id="install">
+      <div>
+        <h2>Install</h2>
+        <p>Rimshot isn't notarized by Apple yet, which takes a paid developer account. Until it is, macOS asks you to approve it once.</p>
+      </div>
+      <div>
+        <ol class="install">
+          <li><a href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg"><b>Download Rimshot.dmg</b></a>, open it, and drag Rimshot into Applications.</li>
+          <li>Open Rimshot. macOS says it <i>could not verify</i> the app. Click <b>Done</b>.</li>
+          <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll to the message about Rimshot, and click <b>Open Anyway</b>.</li>
+          <li>When Rimshot asks for <b>Accessibility</b>, turn it on, then open Rimshot again. Its icon appears in your menu bar.</li>
+        </ol>
+        <p style="margin-top:18px">Comfortable in Terminal? This replaces step 3:</p>
+        <pre>xattr -dr com.apple.quarantine /Applications/Rimshot.app</pre>
+        <details>
+          <summary>Or build it yourself</summary>
+          <p style="margin-top:10px">Apps you build yourself skip the warning. You only need Apple's free Command Line Tools, not Xcode.</p>
+          <pre>git clone https://github.com/manankapoor23/rimshot.git
+cd rimshot &amp;&amp; ./build.sh
+mv Rimshot.app /Applications/</pre>
+        </details>
+      </div>
+    </section>
+
+    <section class="split faq">
+      <div>
+        <h2>Questions</h2>
+      </div>
+      <div>
+        <h3>Does it work on a MacBook Air?</h3>
+        <p>Yes. Any MacBook with a Force Touch trackpad and macOS 13 or later. That covers every MacBook since 2016.</p>
+        <h3>Why does it need Accessibility?</h3>
+        <p>To press keys like volume and escape for you, and to stop a tap on the bar from also clicking whatever is under your cursor. It doesn't read what you type.</p>
+        <h3>Can I pick my own buttons?</h3>
+        <p>Not yet. Custom buttons and per-app sets are next. If you have opinions, <a href="https://github.com/manankapoor23/rimshot/issues">open an issue</a>.</p>
+        <h3>Could a macOS update break it?</h3>
+        <p>Possibly. Reading finger positions takes a private Apple framework, since there's no public way to do it. If something stops working, please report it.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="closing">
+      <h2>Bring the Touch Bar back.</h2>
+      <a class="button" href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg">
+        <svg aria-hidden="true"><use href="#i-down"/></svg>Download for Mac
+      </a>
+    </div>
+    <div class="fine">
+      <span>Free and open source, MIT license.</span>
+      <a href="https://github.com/manankapoor23/rimshot">Source on GitHub</a>
+      <a href="https://github.com/manankapoor23/rimshot/releases">Release notes</a>
+      <span>Touch Bar and MacBook are trademarks of Apple Inc. Rimshot isn't affiliated with Apple.</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const ITEMS = [
+    { name: "esc", label: "esc" },
+    { name: "Brightness", icon: "i-sun", slider: true },
+    { name: "Keyboard light", icon: "i-kbd", slider: true },
+    { name: "Mission Control", icon: "i-mission" },
+    { name: "Screenshot", icon: "i-shot" },
+    { name: "Play / Pause", icon: "i-play" },
+    { name: "Volume", icon: "i-vol", slider: true },
+    { name: "Mute", icon: "i-mute" },
+  ];
+  const FN_ITEMS = [{ name: "esc", label: "esc" }].concat(
+    Array.from({ length: 12 }, (_, i) => ({ name: "F" + (i + 1), label: "F" + (i + 1) })));
+
+  const EDGE = 0.18, CANCEL = 0.5, DWELL = 150, HOLD = 700, STILL = 6;
+  const bar = document.getElementById("bar");
+  const pad = document.getElementById("pad");
+  const finger = document.getElementById("finger");
+  const status = document.getElementById("status");
+  const slider = document.getElementById("slider");
+  const knob = document.getElementById("knob");
+  const fnButton = document.getElementById("fn");
+  const hint = document.getElementById("demo-hint");
+  const canHover = matchMedia("(hover: hover)").matches;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const idleText = canHover ? "Hover the top edge of the trackpad below." : "Touch and rest on the top edge of the trackpad below.";
+  if (!canHover) hint.textContent = "Lift to press. Rest still to charge.";
+  status.textContent = idleText;
+
+  let items = ITEMS, keys = [];
+  let pos = null, touching = false, pointerType = "mouse";
+  let shown = false, index = -1, cancelling = false, fired = false, sliding = null, value = 0.5;
+  let dwellTimer = null, charging = false, chargeStart = 0, holdAnchor = null, statusTimer = null, statusSticky = true;
+
+  function build() {
+    bar.querySelectorAll(".key").forEach(k => k.remove());
+    bar.classList.toggle("fn", items === FN_ITEMS);
+    keys = items.map(item => {
+      const key = document.createElement("div");
+      key.className = "key";
+      key.innerHTML = item.icon
+        ? `<svg><use href="#${item.icon}"/></svg>`
+        : `<span>${item.label}</span>`;
+      bar.appendChild(key);
+      return key;
+    });
+    index = -1;
+    render();
+  }
+
+  function setStatus(html, sticky) {
+    clearTimeout(statusTimer);
+    statusSticky = !!sticky;
+    status.innerHTML = html;
+    if (!sticky) statusTimer = setTimeout(() => { if (!shown) status.textContent = idleText; }, 1600);
+  }
+
+  function tick() { if (navigator.vibrate) navigator.vibrate(6); }
+
+  function show() {
+    dwellTimer = null;
+    shown = true;
+    pad.classList.add("active");
+    setStatus("Slide to pick a button.", true);
+    update();
+  }
+
+  function hide() {
+    clearTimeout(dwellTimer); dwellTimer = null;
+    shown = false; index = -1; cancelling = false; fired = false; sliding = null;
+    stopCharge();
+    pad.classList.remove("active");
+    render();
+    // Keep a just-fired result on screen briefly; otherwise go back to the hint.
+    if (statusSticky) setStatus(idleText, true);
+  }
+
+  function fire(item) {
+    fired = true;
+    const key = keys[index];
+    if (key && !reduceMotion) { key.classList.remove("pressed"); void key.offsetWidth; key.classList.add("pressed"); }
+    setStatus(item.slider ? `<strong>${item.name}</strong> · hold to adjust` : `Pressed <strong>${item.name}</strong>`);
+    tick();
+  }
+
+  function startCharge() {
+    if (charging) return;
+    charging = true;
+    chargeStart = performance.now();
+    requestAnimationFrame(chargeFrame);
+  }
+
+  function stopCharge() {
+    charging = false;
+    keys.forEach(k => k.style.removeProperty("--charge"));
+  }
+
+  function chargeFrame(now) {
+    if (!charging) return;
+    if (!shown || cancelling || fired || sliding || index < 0) { stopCharge(); return; }
+    const progress = Math.min(1, (now - chargeStart) / HOLD);
+    keys[index].style.setProperty("--charge", progress < 0.2 ? 0 : progress);
+    if (progress < 1) { requestAnimationFrame(chargeFrame); return; }
+    stopCharge();
+    const item = items[index];
+    tick(); setTimeout(tick, 60);
+    if (item.slider) {
+      sliding = item;
+      value = 0.5;
+      document.querySelector("#slider-icon use").setAttribute("href", "#" + item.icon);
+      document.getElementById("slider-name").textContent = item.name;
+      setStatus(`Slide to adjust <strong>${item.name}</strong>.`, true);
+    } else {
+      fire(item);
+    }
+    render();
+  }
+
+  function update() {
+    if (!pos) return;
+    const inEdge = pos.y < EDGE;
+    pad.classList.toggle("near", inEdge && !shown);
+    if (!shown) {
+      const resting = canHover ? pointerType === "mouse" || touching : touching;
+      if (inEdge && resting) { if (!dwellTimer) dwellTimer = setTimeout(show, DWELL); }
+      else { clearTimeout(dwellTimer); dwellTimer = null; }
+      return render();
+    }
+    if (sliding) {
+      value = Math.max(0, Math.min(1, pos.x));
+      return render();
+    }
+    cancelling = pos.y > CANCEL;
+    if (cancelling) {
+      stopCharge();
+      setStatus("Release to cancel.", true);
+    } else {
+      const next = Math.max(0, Math.min(items.length - 1, Math.floor(pos.x * items.length)));
+      if (next !== index) {
+        index = next;
+        fired = false;
+        stopCharge();
+        holdAnchor = { ...pos };
+        tick();
+        setStatus(items[index].name === "esc" ? "esc" : items[index].name, true);
+      }
+      // Touch charges by resting still, like the real thing; a mouse charges while the button is held.
+      if (pointerType !== "mouse" && touching && holdAnchor) {
+        const moved = Math.hypot((pos.x - holdAnchor.x) * pad.clientWidth, (pos.y - holdAnchor.y) * pad.clientHeight);
+        if (moved > STILL) { holdAnchor = { ...pos }; stopCharge(); }
+        startCharge();
+      }
+    }
+    render();
+  }
+
+  function render() {
+    bar.classList.toggle("visible", shown);
+    bar.classList.toggle("cancelling", shown && cancelling);
+    bar.classList.toggle("sliding", !!sliding);
+    keys.forEach((k, i) => k.classList.toggle("selected", shown && i === index && !sliding));
+    knob.style.left = (value * 100) + "%";
+    if (pos) { finger.style.left = (pos.x * 100) + "%"; finger.style.top = (pos.y * 100) + "%"; }
+    pad.classList.toggle("touching", !!pos && (canHover ? true : touching));
+  }
+
+  function locate(e) {
+    const r = pad.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
+             y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)) };
+  }
+
+  pad.addEventListener("pointermove", e => { stopAutoplay(); pointerType = e.pointerType; pos = locate(e); update(); });
+  pad.addEventListener("pointerenter", e => { stopAutoplay(); pointerType = e.pointerType; pos = locate(e); update(); });
+  pad.addEventListener("pointerleave", e => {
+    if (e.pointerType === "mouse") { pos = null; hide(); render(); }
+  });
+  pad.addEventListener("pointerdown", e => {
+    stopAutoplay();
+    pointerType = e.pointerType; pos = locate(e);
+    if (e.pointerType !== "mouse") {
+      touching = true;
+      pad.setPointerCapture(e.pointerId);
+      update();
+    } else if (shown && !cancelling && !sliding && index >= 0) {
+      holdAnchor = { ...pos };
+      startCharge();
+    }
+  });
+  // A finger leaving the trackpad: press, cancel, or finish a slider.
+  function lift() {
+    touching = false;
+    if (shown && !cancelling && !fired && !sliding && index >= 0) fire(items[index]);
+    else if (shown && cancelling) setStatus("Cancelled.");
+    else if (sliding) setStatus(`Set <strong>${sliding.name}</strong>.`);
+    pos = null; hide(); render();
+  }
+
+  pad.addEventListener("pointerup", e => {
+    if (e.pointerType !== "mouse") { lift(); return; }
+    const wasCharging = charging;
+    stopCharge();
+    if (sliding) { setStatus(`Set <strong>${sliding.name}</strong>.`); sliding = null; render(); return; }
+    if (shown && !cancelling && !fired && index >= 0 && wasCharging) fire(items[index]);
+    fired = false;
+  });
+  pad.addEventListener("pointercancel", () => { touching = false; pos = null; hide(); });
+
+  fnButton.addEventListener("click", () => {
+    stopAutoplay();
+    const on = fnButton.getAttribute("aria-pressed") !== "true";
+    fnButton.setAttribute("aria-pressed", String(on));
+    items = on ? FN_ITEMS : ITEMS;
+    build();
+  });
+
+  // Until someone touches the demo, it plays itself: rest, slide, hold to fire,
+  // then hold Volume into a slider.
+  let autoplay = true;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  function glide(to, ms) {
+    const from = { ...pos }, start = performance.now();
+    return new Promise(done => {
+      (function step(now) {
+        if (!autoplay) return done();
+        const t = Math.min(1, (now - start) / ms), e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        pos = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
+        update();
+        if (t < 1) requestAnimationFrame(step); else done();
+      })(start);
+    });
+  }
+  async function play() {
+    pointerType = "auto";
+    while (autoplay) {
+      pos = { x: 0.24, y: 0.62 }; touching = true; update();
+      await sleep(500); if (!autoplay) return;
+      await glide({ x: 0.27, y: 0.08 }, 600); if (!autoplay) return;
+      await sleep(450); if (!autoplay) return;
+      await glide({ x: 0.44, y: 0.09 }, 900); if (!autoplay) return;
+      await sleep(1300); if (!autoplay) return;          // holds on Mission Control until it fires
+      lift(); await sleep(1500); if (!autoplay) return;
+
+      pos = { x: 0.62, y: 0.6 }; touching = true; update();
+      await sleep(400); if (!autoplay) return;
+      await glide({ x: 0.66, y: 0.08 }, 550); if (!autoplay) return;
+      await sleep(400); if (!autoplay) return;
+      await glide({ x: 0.81, y: 0.09 }, 600); if (!autoplay) return;
+      await sleep(1100); if (!autoplay) return;          // charges Volume into a slider
+      await glide({ x: 0.93, y: 0.1 }, 700); if (!autoplay) return;
+      await glide({ x: 0.62, y: 0.1 }, 900); if (!autoplay) return;
+      lift(); await sleep(1800);
+    }
+  }
+  function stopAutoplay() {
+    if (!autoplay) return;
+    autoplay = false;
+    touching = false; pos = null; hide(); render();
+    pointerType = "mouse";
+  }
+
+  build();
+  if (reduceMotion) {
+    autoplay = false;
+    shown = true; index = 3; render();
+    status.textContent = "Slide to pick a button.";
+  } else {
+    play();
+  }
+})();
+</script>
+</body>
+</html>
