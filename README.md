@@ -6,9 +6,7 @@ It's an independent reimplementation of the idea behind paid apps like EdgeBar. 
 
 ---
 
-## Context for Claude Code
-
-Read this whole file before making changes.
+## Development notes
 
 ### Hard constraints
 
