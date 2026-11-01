@@ -1,181 +1,88 @@
-# Rimshot
+<p align="center">
+  <img src="docs/zones.svg" alt="Rimshot trackpad zones: brightness on the left edge, volume on the right, keyboard light along the top, mute in the top-right corner" width="760">
+</p>
 
-A free, open-source macOS menu bar app that turns the edges of a MacBook trackpad into volume and brightness sliders. Slide a finger along the left edge to change brightness and along the right edge to change volume. macOS shows its own on-screen display, the same one the keyboard keys trigger.
+<h1 align="center">Rimshot</h1>
 
-It's an independent reimplementation of the idea behind paid apps like EdgeBar. Don't copy any other app's name, icon, branding or code.
+<p align="center">
+  <strong>Your MacBook trackpad has edges you never use. Rimshot turns them into sliders.</strong>
+</p>
 
----
+<p align="center">
+  <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-native-F05138?logo=swift&logoColor=white">
+  <img alt="Size" src="https://img.shields.io/badge/size-416%20KB-success">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
 
-## Development notes
+Slide a finger up the right edge and the volume goes up. Slide the left edge for brightness and the top edge for the keyboard backlight. Double-tap the top-right corner to mute. macOS shows its usual on-screen display, you feel a light haptic tick on every step, and the cursor stays put while you slide.
 
-### Hard constraints
+No more hunting for the brightness keys, and no Touch Bar required. It's free, open source, and a no-cost alternative to paid edge-gesture apps like EdgeBar.
 
-- No Xcode. The developer has only the Xcode Command Line Tools (`xcode-select --install`). Everything has to build with `swiftc` from the terminal through `build.sh`. Don't add `.xcodeproj`, storyboards, asset catalogs or anything else that needs Xcode.
-- Target macOS 13 Ventura or later (needed for `SMAppService`).
-- Build a single-binary menu bar app in Swift with AppKit. SwiftUI is fine for a settings window later, but the app has to launch through `NSApplication` with `.accessory` activation policy (no Dock icon).
-- The app is not sandboxed and not meant for the App Store. It uses a private framework.
-- Sign it ad hoc with `codesign --sign -`.
-- Keep CPU usage near zero: no polling loops and no timers while idle.
+## What you can do
 
-### Current files
-
-```
-rimshot/
-├── main.swift   # entire app: multitouch bindings, gestures, media keys, menu
-├── build.sh     # compiles with swiftc, writes Info.plist, ad-hoc signs Rimshot.app
-└── README.md    # this file
-```
-
-The developer can't run Xcode's debugger. Use `NSLog` for diagnostics and read the output with `log stream --predicate 'process == "Rimshot"'`, or by running `Rimshot.app/Contents/MacOS/Rimshot` directly from the terminal. Set `RIMSHOT_DEBUG=1` to log every touch-down zone, step, swipe and tap.
-
----
-
-## Features
-
-| Feature | Behavior |
-|---|---|
-| Brightness slider | Slide vertically on the left edge |
-| Volume slider | Slide vertically on the right edge |
-| Keyboard backlight slider | Slide horizontally along the top edge: right is brighter, left is dimmer (on by default) |
-| Native OSD | Uses the same system overlay as the keyboard keys |
-| Fine control | Hold Shift+Option while sliding for quarter steps |
-| Quick Mute | Double-tap the top-right corner |
-| Media Strip | Swipe along the bottom edge to go to the next or previous track (off by default) |
-| Tap to Play | With Media Strip on, tapping the bottom edge plays or pauses (off by default) |
-| Haptic feedback | A light tick on every step |
-| Cursor freeze | The pointer stays still while sliding on an edge, and snaps back to where the slide started |
-| Bottom Quarter Only | Only the lower 25% of the side edges respond |
-| Swap Sides | Puts brightness on the right and volume on the left |
-| Open at Login | Uses `SMAppService.mainApp` |
-| Menu bar only | `LSUIElement = YES`, no Dock icon |
-| Trackpad View | Testing window (menu → Show Trackpad View, or launch with `--viewer`) that draws the zones to scale, live fingers, step ticks and an action log |
-
----
-
-## How it works
-
-### 1. Raw trackpad input: MultitouchSupport (private)
-
-Public `NSEvent` gestures don't expose finger positions, so the app reads raw touches from `/System/Library/PrivateFrameworks/MultitouchSupport.framework`.
-
-- Load it at runtime with `dlopen` and `dlsym`. Don't link against it, because the framework sits in the dyld shared cache and has no `.tbd` in the SDK.
-- The symbols it uses are `MTDeviceCreateList`, `MTRegisterContactFrameCallback` and `MTDeviceStart`.
-- The callback runs about 100 times a second on a background thread. It delivers an array of `MTTouch` structs, each 96 bytes. Their layout is defined in `main.swift` and has to match the C layout exactly.
-- `normalized.pos` gives x from 0 (left) to 1 (right) and y from 0 (bottom) to 1 (top).
-- Touch `state` values 4 and 5 mean the finger is in contact.
-- Keep the device list alive in a global, or the callbacks stop.
-
-### 2. Volume and brightness: synthetic media key events
-
-The app posts `NSEvent.otherEvent(with: .systemDefined, subtype: 8, ...)` events and sends them through `cgEvent.post(tap: .cghidEventTap)`. macOS handles them exactly like the physical keys, so the native on-screen display appears.
-
-These are the key codes from IOKit's `NX_KEYTYPE_*`:
-
-| Key | Code |
-|---|---|
-| Sound up / down | 0 / 1 |
-| Brightness up / down | 2 / 3 |
-| Mute | 7 |
-| Keyboard backlight up / down | 21 / 22 |
-| Play | 16 |
-| Next / Previous | 17 / 18 |
-
-The event fields are `data1 = (key << 16) | (state << 8)`, with state `0xA` for key down and `0xB` for key up. For fine control, the Shift and Option modifier flags are added to the event.
-
-Posting these events requires Accessibility permission (`AXIsProcessTrustedWithOptions` with the prompt option).
-
-### 3. Gesture state machine (`Gestures` class)
-
-- The app tracks exactly one finger. Two or more fingers cancel the gesture, so normal scrolling and other gestures are never hijacked.
-- On touch-down it assigns a zone: `corner` (top-right), `left`, `right`, `bottom` (only when Media Strip is on) or `none`.
-- A vertical slide that starts in the corner behaves like the right edge, so the top of the right slider still works.
-- If a side-edge finger moves more than `2 × EDGE_WIDTH` sideways before the first step, the gesture is dropped as an ordinary cursor move.
-- In the left and right zones, every `STEP` of vertical travel emits one key event and one haptic tick. The cursor freezes on the first step.
-- On lift in the bottom zone, a horizontal travel of at least `SWIPE_MIN` counts as a skip. A short, still touch counts as a tap.
-- On lift in the corner zone, two quick taps within `DOUBLE_TAP_GAP` trigger mute.
-- Every AppKit call is dispatched to the main thread.
-
-### 4. Other APIs
-
-- Haptics use `NSHapticFeedbackManager.defaultPerformer.perform(.alignment, ...)`.
-- Cursor freeze uses `CGAssociateMouseAndMouseCursorPosition(0/1)`. The position is saved on touch-down and restored with `CGWarpMouseCursorPosition` on the first step.
-- Settings are stored in `UserDefaults`, with keys `swapSides`, `bottomQuarter`, `haptics`, `mediaStrip`, `tapToPlay` and `topEdge`.
-- Login items use `SMAppService.mainApp.register()` and `unregister()`.
-
-### Tuning constants (top of `main.swift`)
-
-| Constant | Default | Meaning |
+| Where | Gesture | What happens |
 |---|---|---|
-| `EDGE_WIDTH` | 0.06 | Width of each edge zone |
-| `CORNER_SIZE` | 0.12 | Size of the mute corner |
-| `STEP` | 0.035 | Vertical travel per step |
-| `TOP_STEP` | 0.022 | Horizontal travel per step on the top edge |
-| `SWIPE_MIN` | 0.15 | Horizontal travel needed to skip a track |
-| `TAP_MAX_TIME` | 0.25 s | Longest touch that still counts as a tap |
-| `DOUBLE_TAP_GAP` | 0.40 s | Longest gap between taps for a double-tap |
-| `TAP_MAX_MOVE` | 0.02 | Farthest a finger can move and still count as a tap |
-| `BOTTOM_QUARTER` | 0.25 | Height of the active band for Bottom Quarter Only |
+| **Left edge** | Slide up or down | Display brightness |
+| **Right edge** | Slide up or down | Volume |
+| **Top edge** | Slide left or right | Keyboard backlight |
+| **Top-right corner** | Double-tap | Mute / unmute |
+| **Bottom edge** *(optional)* | Swipe left or right | Previous / next track |
+| **Bottom edge** *(optional)* | Tap | Play / pause |
+| **Any slider** | Hold <kbd>⇧</kbd> <kbd>⌥</kbd> while sliding | Quarter steps for fine control |
 
----
+## Why Rimshot
 
-## Build and run
+- **Feels built in.** It uses the same volume and brightness overlay as your keyboard keys, a haptic tick on every step, and a cursor that doesn't drift while you slide.
+- **Stays out of your way.** Only single-finger slides that start on an edge count. Two-finger scrolling, clicking and every other gesture work exactly as before. If your finger heads inward, Rimshot treats it as a normal cursor move and backs off.
+- **Tiny and native.** It's written in Swift with AppKit, and the whole app is 416 KB. It uses about 30 MB of memory and **0% CPU** when idle, because it wakes up only when you touch the trackpad. No Electron and no background polling.
+- **Yours to read.** Rimshot needs Accessibility permission, so you should be able to see what it does: the whole app is about 950 lines of Swift in a single file.
+
+## Install
+
+You'll need macOS 13 Ventura or later and a MacBook. Building takes about 30 seconds and needs only Apple's free Command Line Tools, not Xcode.
 
 ```bash
-xcode-select -p || xcode-select --install   # make sure the Command Line Tools exist
-./build.sh
-mv Rimshot.app /Applications/
-open /Applications/Rimshot.app
+xcode-select --install          # skip if you already have the Command Line Tools
+git clone https://github.com/manankapoor23/rimshot.git
+cd rimshot && ./build.sh
+mv Rimshot.app /Applications/ && open /Applications/Rimshot.app
 ```
 
-Then turn on Rimshot under System Settings → Privacy & Security → Accessibility, and relaunch the app.
+Because you build it yourself, macOS won't show "unidentified developer" warnings.
 
-Every rebuild changes the ad-hoc signature, so macOS may silently stop trusting the app. If it stops responding after a rebuild, remove it from the Accessibility list, add it back and relaunch.
+### First launch
 
----
+Rimshot asks for **Accessibility** permission the first time it runs. It needs this to send volume and brightness key presses to macOS, the same way your keyboard does. Turn it on under **System Settings → Privacy & Security → Accessibility**, then relaunch Rimshot.
 
-## Known risks and things to verify
+A slider icon appears in your menu bar. There's no Dock icon.
 
-1. `MTTouch` struct layout. If touch positions look like garbage, the struct layout or stride is wrong. Log `MemoryLayout<MTTouch>.stride`, which should be 96.
-2. Brightness keys. Synthetic brightness events may not work on every Mac or with external displays. The fallback is the private `DisplayServices.framework` (`DisplayServicesGetBrightness` and `DisplayServicesSetBrightness`, loaded with `dlopen`), plus drawing a custom on-screen display.
-3. Haptics in a background app. `NSHapticFeedbackManager` may not fire while the app isn't frontmost. Check it, and if it doesn't fire, look into the private `MTActuator` APIs in MultitouchSupport.
-4. Cursor freeze. `CGAssociateMouseAndMouseCursorPosition` may behave inconsistently for an accessory app. The fallback is to save the cursor position on the first step and call `CGWarpMouseCursorPosition` on each frame.
-5. False triggers. Clicking or moving the cursor near the edges shouldn't change volume. Tune `EDGE_WIDTH` and `STEP`, and think about requiring a minimum slide distance before the first step fires.
-6. External Magic Trackpad. `MTDeviceCreateList` returns every multitouch device. Check whether the zones make sense on an external trackpad, or limit the app to the built-in one.
+## Settings
 
----
+Everything lives in the menu bar menu:
 
-## Manual test checklist
+- **Swap Sides**: brightness on the right, volume on the left.
+- **Bottom Quarter Only**: side slides only start from the lower 25% of the edges, for people who rest a finger near the edges.
+- **Haptic Feedback**: the tick on each step.
+- **Keyboard Light (top edge)**: on by default.
+- **Media Strip** and **Tap to Play**: track controls on the bottom edge, off by default.
+- **Open at Login**.
 
-- [ ] The app launches with no Dock icon and the menu bar icon appears
-- [ ] The Accessibility prompt shows on first launch
-- [ ] Sliding the left edge up and down changes brightness and shows the native display
-- [ ] Sliding the right edge up and down changes volume and shows the native display
-- [ ] Shift+Option while sliding gives quarter steps
-- [ ] Sliding along the top edge changes the keyboard backlight and shows the native display
-- [ ] Double-tapping the top-right corner toggles mute
-- [ ] A bottom-edge swipe right or left skips to the next or previous track (test with Spotify or Music)
-- [ ] Bottom-edge swipes do nothing while Media Strip is off
-- [ ] Tap to Play works only when its toggle is on
-- [ ] A haptic tick fires on each step
-- [ ] The cursor doesn't move while sliding
-- [ ] Swap Sides and Bottom Quarter Only work and survive a relaunch
-- [ ] Open at Login survives a reboot
-- [ ] Two-finger scrolling and normal clicking near the edges are unaffected
-- [ ] CPU usage is about 0% when idle (check Activity Monitor)
+## See what Rimshot sees
 
----
+Choose **Show Trackpad View** from the menu to open a live, to-scale map of your trackpad. It shows every zone, your fingers as you touch, where each step will fire, and a log of every action. It's handy for learning the zones, and for reporting bugs.
 
-## Roadmap
+## Good to know
 
-- [ ] A settings window (SwiftUI) with sliders for the tuning constants
-- [ ] An optional modifier key that must be held for edge sliding to work
-- [ ] Live brightness and volume levels shown in the menu
-- [ ] A Light/Dark menu bar icon and a proper app icon (`.icns` generated with `iconutil`, no Xcode)
-- [ ] A haptic strength setting
-- [ ] A first-run setup guide
-- [ ] Splitting `main.swift` into files (`Multitouch.swift`, `Gestures.swift`, `MediaKeys.swift`, `AppDelegate.swift`) and updating `build.sh` to compile them all
-- [ ] A GitHub release with a zipped `.app` and install instructions
+- Rimshot reads raw touch data through a private Apple framework, `MultitouchSupport`. That's the only way to see where fingers are, but it means a future macOS update could break it. If that happens, please [open an issue](https://github.com/manankapoor23/rimshot/issues).
+- Brightness and keyboard light work by simulating the hardware keys. That may not work on every Mac model or with external displays.
+- If **tap to click** is on, the double-tap in the mute corner also counts as a double-click wherever your cursor is.
+- If you rebuild the app, macOS may stop trusting it. Remove Rimshot from the Accessibility list, add it back, and relaunch.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. [DEVELOPMENT.md](DEVELOPMENT.md) covers how Rimshot works under the hood, the tuning constants, the build constraints and the manual test checklist.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE). Free to use, change and share.
