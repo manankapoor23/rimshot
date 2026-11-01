@@ -1,4 +1,4 @@
-// Rimshot: trackpad edges as volume and brightness sliders.
+// Rimshot: the Touch Bar, back on your trackpad.
 // Entire app: multitouch bindings, gestures, media keys, menu.
 
 import AppKit
@@ -8,14 +8,10 @@ import ServiceManagement
 // MARK: - Tuning constants (normalized trackpad units, 0...1)
 
 let EDGE_WIDTH: Float = 0.06        // width of each edge zone
-let CORNER_SIZE: Float = 0.12       // size of the mute corner
-let STEP: Float = 0.035             // vertical travel per step
-let TOP_STEP: Float = 0.022         // horizontal travel per step on the top edge (≈ same distance as STEP)
+let TOP_STEP: Float = 0.022         // horizontal travel per slider step on the top edge
 let SWIPE_MIN: Float = 0.15         // horizontal travel needed to skip a track
 let TAP_MAX_TIME: Double = 0.25     // longest touch that still counts as a tap
-let DOUBLE_TAP_GAP: Double = 0.40   // longest gap between taps for a double-tap
 let TAP_MAX_MOVE: Float = 0.02      // farthest a finger can wander and still count as a tap
-let BOTTOM_QUARTER: Float = 0.25    // height of the active band when Bottom Quarter Only is on
 let BAR_DWELL: Double = 0.15        // how long a finger rests on the top edge before the Touch Bar appears
 let BAR_HOLD: Double = 0.70         // hold a button this long to fire it (or start adjusting a slider)
 // Points in the hold (fractions of BAR_HOLD) where a charge-up haptic fires; they get closer together.
@@ -183,8 +179,6 @@ enum Cursor {
 // MARK: - Settings
 
 struct Settings {
-    var swapSides: Bool
-    var bottomQuarter: Bool
     var haptics: Bool
     var mediaStrip: Bool
     var tapToPlay: Bool
@@ -192,15 +186,12 @@ struct Settings {
     var touchBar: Bool
 
     static let defaults: [String: Any] = [
-        "swapSides": false, "bottomQuarter": false, "haptics": true,
-        "mediaStrip": false, "tapToPlay": false, "topEdge": true, "touchBar": true,
+        "haptics": true, "mediaStrip": false, "tapToPlay": false, "topEdge": true, "touchBar": true,
     ]
 
     static func load() -> Settings {
         let d = UserDefaults.standard
         return Settings(
-            swapSides: d.bool(forKey: "swapSides"),
-            bottomQuarter: d.bool(forKey: "bottomQuarter"),
             haptics: d.bool(forKey: "haptics"),
             mediaStrip: d.bool(forKey: "mediaStrip"),
             tapToPlay: d.bool(forKey: "tapToPlay"),
@@ -281,7 +272,7 @@ struct BarState: Equatable {
     var slider = false
     var cancelling = false
     var steps = 0
-    var charge = 0          // 0...10, how far a hold has charged
+    var charge = 0          // 0...20, how far a hold has charged
     var pressed = false     // the button already fired during this touch
 }
 
@@ -290,7 +281,7 @@ struct BarState: Equatable {
 // Runs on the multitouch callback thread. Tracks exactly one finger; a second
 // finger cancels the gesture until every finger lifts.
 final class Gestures {
-    enum Zone { case none, corner, left, right, top, bottom }
+    enum Zone { case none, top, bottom }
     private enum Phase { case idle, ignoring, tracking }
 
     private let lock = NSLock()
@@ -301,12 +292,10 @@ final class Gestures {
     private var settings = Settings.load()
     private var startPos = MTPoint(x: 0, y: 0)
     private var lastPos = MTPoint(x: 0, y: 0)
-    private var anchorY: Float = 0
     private var anchorX: Float = 0
     private var startTime: Double = 0
     private var maxMove: Float = 0
     private var stepped = false
-    private var lastCornerTap: Double = 0
     private var observing = false   // true while the trackpad viewer is open
 
     // Touch Bar
@@ -325,7 +314,6 @@ final class Gestures {
 
     // Click swallowing (see shouldSwallow)
     private var swallowClicksUntil: Double = 0
-    private var cornerClickWindow: Double = 0
     private var swallowedDown = false
 
     func setObserving(_ on: Bool) {
@@ -374,10 +362,6 @@ final class Gestures {
     }
 
     private func zoneFor(_ p: MTPoint) -> Zone {
-        if p.x >= 1 - CORNER_SIZE && p.y >= 1 - CORNER_SIZE { return .corner }
-        let sideAllowed = !settings.bottomQuarter || p.y <= BOTTOM_QUARTER
-        if sideAllowed && p.x <= EDGE_WIDTH { return .left }
-        if sideAllowed && p.x >= 1 - EDGE_WIDTH { return .right }
         if settings.topEdge && p.y >= 1 - EDGE_WIDTH { return .top }
         if settings.mediaStrip && p.y <= EDGE_WIDTH { return .bottom }
         return .none
@@ -397,7 +381,6 @@ final class Gestures {
         fingerID = touch.identifier
         startPos = p
         lastPos = p
-        anchorY = p.y
         anchorX = p.x
         startTime = now
         maxMove = 0
@@ -410,8 +393,6 @@ final class Gestures {
         barFired = false
         barHoldTicks = 0
         barCharge = 0
-        // A tap in the corner also makes a tap-to-click; swallow it unless this turns into a slide.
-        if zone == .corner { cornerClickWindow = now + TAP_MAX_TIME + CLICK_GRACE }
         if zone != .bottom { DispatchQueue.main.async { Cursor.remember() } }
     }
 
@@ -425,30 +406,9 @@ final class Gestures {
         lastPos = p
         maxMove = max(maxMove, hypot(p.x - startPos.x, p.y - startPos.y))
 
-        if zone == .corner && (maxMove > TAP_MAX_MOVE || now - startTime > TAP_MAX_TIME) {
-            cornerClickWindow = 0
-        }
-        // A vertical slide that starts in the corner works as the right edge.
-        if zone == .corner && !settings.bottomQuarter && abs(p.y - anchorY) >= STEP {
-            zone = .right
-        }
         if zone == .top {
             if settings.touchBar { moveBar(p, now) } else { slideTop(p) }
-            return
         }
-        guard zone == .left || zone == .right else { return }
-
-        // Heading inward before the first step means it's a cursor move, not a slide.
-        if !stepped && abs(p.x - startPos.x) > 2 * EDGE_WIDTH {
-            if DEBUG { NSLog("Rimshot: finger left the edge, ignoring") }
-            report("Ignored: moved inward (cursor move)")
-            phase = .ignoring
-            return
-        }
-
-        var dy = p.y - anchorY
-        while dy >= STEP { step(up: true); anchorY += STEP; dy -= STEP }
-        while dy <= -STEP { step(up: false); anchorY -= STEP; dy += STEP }
     }
 
     // Top edge without Touch Bar mode: a horizontal keyboard light slider, right is up.
@@ -531,7 +491,7 @@ final class Gestures {
                 DispatchQueue.main.async { Haptics.charge(due, of: BAR_CHARGE_TICKS.count) }
             }
         }
-        barCharge = progress < BAR_CHARGE_TICKS[0] ? 0 : min(10, Int(progress * 10))
+        barCharge = progress < BAR_CHARGE_TICKS[0] ? 0 : min(20, Int(progress * 20))
         guard progress >= 1 else { return }
 
         if settings.haptics { DispatchQueue.main.async { Haptics.thump() } }
@@ -579,15 +539,9 @@ final class Gestures {
         if let keys {
             key = up ? keys.up : keys.down
             name = keys.name
-        } else if zone == .top {
+        } else {
             key = up ? KEY_ILLUMINATION_UP : KEY_ILLUMINATION_DOWN
             name = "Keyboard light"
-        } else if (zone == .left) != settings.swapSides {
-            key = up ? KEY_BRIGHTNESS_UP : KEY_BRIGHTNESS_DOWN
-            name = "Brightness"
-        } else {
-            key = up ? KEY_SOUND_UP : KEY_SOUND_DOWN
-            name = "Volume"
         }
         let fine = CGEventSource.flagsState(.combinedSessionState).isSuperset(of: [.maskShift, .maskAlternate])
         let haptics = settings.haptics
@@ -613,19 +567,8 @@ final class Gestures {
             }
             hideBar()
             DispatchQueue.main.async { Cursor.release() }
-        case .left, .right, .top:
+        case .top:
             if stepped { DispatchQueue.main.async { Cursor.release() } }
-        case .corner:
-            guard isTap else { break }
-            if now - lastCornerTap <= DOUBLE_TAP_GAP {
-                lastCornerTap = 0
-                if DEBUG { NSLog("Rimshot: mute") }
-                report("Mute toggled")
-                DispatchQueue.main.async { MediaKeys.press(KEY_MUTE) }
-            } else {
-                lastCornerTap = now
-                report("Corner tap 1 of 2…")
-            }
         case .bottom:
             let dx = lastPos.x - startPos.x
             let dy = lastPos.y - startPos.y
@@ -653,8 +596,7 @@ final class Gestures {
     // MARK: Click swallowing
 
     // Called by the click event tap on the main thread. Returns true to drop the click,
-    // so tapping or pressing on the bar or the mute corner doesn't also click whatever
-    // is under the cursor.
+    // so tapping or pressing on the bar doesn't also click whatever is under the cursor.
     func shouldSwallow(_ type: CGEventType) -> Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -686,7 +628,7 @@ final class Gestures {
             }
             return true
         }
-        return now < swallowClicksUntil || now < cornerClickWindow
+        return now < swallowClicksUntil
     }
 
     // MARK: Viewer feed (only while the viewer is open)
@@ -841,12 +783,12 @@ final class TouchBarView: NSView {
             (selected ? NSColor.controlAccentColor : NSColor.labelColor.withAlphaComponent(0.08)).setFill()
             shape.fill()
             if selected && state.charge > 0 {
-                // The hold fills the button from the bottom as it charges.
-                NSGraphicsContext.saveGraphicsState()
-                shape.addClip()
-                NSColor.white.withAlphaComponent(0.3).setFill()
-                NSRect(x: r.minX, y: r.minY, width: r.width, height: r.height * CGFloat(state.charge) / 10).fill()
-                NSGraphicsContext.restoreGraphicsState()
+                // As the hold charges, a glow grows from the middle of the button out to its edges.
+                let f = CGFloat(state.charge) / 20
+                let glow = NSRect(x: r.midX - r.width * f / 2, y: r.midY - r.height * f / 2,
+                                  width: r.width * f, height: r.height * f)
+                NSColor.white.withAlphaComponent(0.18 + 0.17 * f).setFill()
+                NSBezierPath(roundedRect: glow, xRadius: 9 * f, yRadius: 9 * f).fill()
             }
             let color: NSColor = selected ? .white : NSColor.labelColor.withAlphaComponent(state.cancelling ? 0.3 : 0.85)
             let caption: String? = !selected ? nil
@@ -943,9 +885,6 @@ final class TrackpadView: NSView {
     var events: [(time: Date, text: String)] = []
     var accessibilityGranted = AXIsProcessTrusted()
 
-    private let brightnessColor = NSColor.systemOrange
-    private let volumeColor = NSColor.systemBlue
-    private let muteColor = NSColor.systemRed
     private let mediaColor = NSColor.systemPurple
     private let keyboardColor = NSColor.systemGreen
     private let clock: DateFormatter = {
@@ -989,35 +928,8 @@ final class TrackpadView: NSView {
         text("normal trackpad", at: NSPoint(x: pad.midX, y: pad.midY), size: 13,
              color: .tertiaryLabelColor, weight: .regular)
 
-        // Side edges.
-        let leftIsBrightness = !s.swapSides
-        for side in [Gestures.Zone.left, .right] {
-            let isBrightness = (side == .left) == leftIsBrightness
-            let color = isBrightness ? brightnessColor : volumeColor
-            let active = snap.zone == side
-            let x0: Float = side == .left ? 0 : 1 - EDGE_WIDTH
-            let x1: Float = side == .left ? EDGE_WIDTH : 1
-            let startTop: Float = s.bottomQuarter ? BOTTOM_QUARTER : 1
-            // Where a slide may start, and (with Bottom Quarter Only) where it can continue.
-            fill(rect(x0, 0, x1, startTop), color, alpha: active ? 0.45 : 0.22)
-            if s.bottomQuarter {
-                fill(rect(x0, startTop, x1, 1), color, alpha: active ? 0.3 : 0.06)
-            }
-            let label = (isBrightness ? "BRIGHTNESS" : "VOLUME") + "  ▲▼"
-            let labelY: Float = s.bottomQuarter ? BOTTOM_QUARTER / 2 : 0.5
-            text(label, at: point(MTPoint(x: (x0 + x1) / 2, y: labelY)), size: 11,
-                 color: color, rotated: true)
-        }
-        if s.bottomQuarter {
-            dashedLine(from: point(MTPoint(x: 0, y: BOTTOM_QUARTER)),
-                       to: point(MTPoint(x: 1, y: BOTTOM_QUARTER)), color: .secondaryLabelColor)
-            text("Bottom Quarter Only: side slides must start below this line",
-                 at: point(MTPoint(x: 0.5, y: BOTTOM_QUARTER + 0.03)), size: 10,
-                 color: .secondaryLabelColor, weight: .regular)
-        }
-
         // Bottom media strip.
-        let strip = rect(EDGE_WIDTH, 0, 1 - EDGE_WIDTH, EDGE_WIDTH)
+        let strip = rect(0, 0, 1, EDGE_WIDTH)
         if s.mediaStrip {
             fill(strip, mediaColor, alpha: snap.zone == .bottom ? 0.45 : 0.22)
             let label = "◀◀ PREV   ·   swipe   ·   NEXT ▶▶" + (s.tapToPlay ? "      tap: ▶︎❙❙" : "")
@@ -1029,7 +941,7 @@ final class TrackpadView: NSView {
         }
 
         // Top strip: Touch Bar or keyboard light slider.
-        let top = rect(EDGE_WIDTH, 1 - EDGE_WIDTH, 1 - CORNER_SIZE, 1)
+        let top = rect(0, 1 - EDGE_WIDTH, 1, 1)
         if s.topEdge && s.touchBar {
             fill(top, keyboardColor, alpha: snap.zone == .top ? 0.45 : 0.22)
             text("TOUCH BAR  ·  rest, slide, lift", at: NSPoint(x: top.midX, y: top.midY),
@@ -1058,40 +970,6 @@ final class TrackpadView: NSView {
             dashedRect(top, color: .tertiaryLabelColor)
             text("keyboard light off", at: NSPoint(x: top.midX, y: top.midY), size: 10,
                  color: .tertiaryLabelColor, weight: .regular)
-        }
-
-        // Mute corner (drawn over the right edge it overlaps).
-        let corner = rect(1 - CORNER_SIZE, 1 - CORNER_SIZE, 1, 1)
-        NSColor.controlBackgroundColor.setFill()
-        corner.fill()
-        fill(corner, muteColor, alpha: snap.zone == .corner ? 0.45 : 0.22)
-        text("MUTE", at: NSPoint(x: corner.midX, y: corner.midY + 7), size: 11, color: muteColor)
-        text("double-tap", at: NSPoint(x: corner.midX, y: corner.midY - 8), size: 9,
-             color: muteColor, weight: .regular)
-
-        // Live slide guides: step ticks from the touch-down point, and the inward limit.
-        if snap.zone == .left || snap.zone == .right {
-            let x0: Float = snap.zone == .left ? 0 : 1 - EDGE_WIDTH
-            let x1: Float = snap.zone == .left ? EDGE_WIDTH : 1
-            var k: Float = -40
-            while k <= 40 {
-                let y = snap.startPos.y + k * STEP
-                if y >= 0 && y <= 1 {
-                    let a = point(MTPoint(x: x0, y: y)), b = point(MTPoint(x: x1, y: y))
-                    let tick = NSBezierPath()
-                    tick.move(to: a); tick.line(to: b)
-                    tick.lineWidth = k == 0 ? 2 : 1
-                    NSColor.labelColor.withAlphaComponent(k == 0 ? 0.8 : 0.35).setStroke()
-                    tick.stroke()
-                }
-                k += 1
-            }
-            if !snap.stepped {
-                let limit = snap.zone == .left
-                    ? snap.startPos.x + 2 * EDGE_WIDTH : snap.startPos.x - 2 * EDGE_WIDTH
-                dashedLine(from: point(MTPoint(x: limit, y: 0)), to: point(MTPoint(x: limit, y: 1)),
-                           color: .systemRed)
-            }
         }
 
         if snap.zone == .top && s.touchBar {
@@ -1180,9 +1058,6 @@ final class TrackpadView: NSView {
 
     private func zoneColor(_ zone: Gestures.Zone, _ s: Settings) -> NSColor {
         switch zone {
-        case .left: return s.swapSides ? volumeColor : brightnessColor
-        case .right: return s.swapSides ? brightnessColor : volumeColor
-        case .corner: return muteColor
         case .bottom: return mediaColor
         case .top: return keyboardColor
         case .none: return .labelColor
@@ -1191,9 +1066,6 @@ final class TrackpadView: NSView {
 
     private func zoneName(_ zone: Gestures.Zone, _ s: Settings) -> String {
         switch zone {
-        case .left: return s.swapSides ? "left (volume)" : "left (brightness)"
-        case .right: return s.swapSides ? "right (brightness)" : "right (volume)"
-        case .corner: return "corner (mute)"
         case .bottom: return "bottom (media)"
         case .top: return s.touchBar ? "top (touch bar)" : "top (keyboard light)"
         case .none: return "none"
@@ -1256,7 +1128,6 @@ final class ViewerController: NSObject, NSWindowDelegate {
         window.delegate = self
 
         let toggles: [(String, String)] = [
-            ("Swap Sides", "swapSides"), ("Bottom Quarter Only", "bottomQuarter"),
             ("Haptics", "haptics"), ("Top Edge", "topEdge"), ("Touch Bar", "touchBar"),
             ("Media Strip", "mediaStrip"), ("Tap to Play", "tapToPlay"),
         ]
@@ -1394,8 +1265,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
 
         let d = UserDefaults.standard
-        menu.addItem(toggle("Swap Sides", key: "swapSides"))
-        menu.addItem(toggle("Bottom Quarter Only", key: "bottomQuarter"))
         menu.addItem(toggle("Haptic Feedback", key: "haptics"))
         menu.addItem(toggle("Top Edge", key: "topEdge"))
         let bar = toggle("Touch Bar (off: keyboard light slider)", key: "touchBar")

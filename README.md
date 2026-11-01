@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-native-F05138?logo=swift&logoColor=white">
-  <img alt="Size" src="https://img.shields.io/badge/size-~550%20KB-success">
+  <img alt="Size" src="https://img.shields.io/badge/size-~540%20KB-success">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
@@ -24,7 +24,7 @@ Rest a finger on the top edge of your trackpad and a Touch Bar appears on screen
 1. **Rest** a finger on the top edge of the trackpad. The bar fades in at the bottom of your screen.
 2. **Slide** left or right. The highlight follows your finger, with a haptic tick on each new button.
 3. **Lift** to press. Or press down on the trackpad to fire it right away.
-4. **Hold** to charge it up. Stay on a button and the ticks come faster and stronger while the button fills, then it fires on its own. On Brightness, Keyboard Light or Volume, a full charge turns the button into a slider you can drag.
+4. **Hold** to charge it up. Stay on a button and the ticks come faster and stronger while a glow grows from the middle of the button out to its edges, then it fires on its own. On Brightness, Keyboard Light or Volume, a full charge turns the button into a slider you can drag. Hold <kbd>⇧</kbd> <kbd>⌥</kbd> while dragging for quarter steps.
 5. **Changed your mind?** Slide down into the trackpad and let go.
 
 ## What's on the bar
@@ -49,30 +49,24 @@ Rest a finger on the top edge of your trackpad and a Touch Bar appears on screen
 - **No accidental presses.** A quick touch does nothing. The bar only appears when you rest your finger, and you can always slide away to cancel. Taps on the bar never click whatever is under your cursor.
 - **Works on every MacBook** with macOS 13 or later, including Airs that never had a Touch Bar.
 
-## Bonus: edge sliders
+## Bonus: media strip
 
 <p align="center">
-  <img src="docs/zones.svg" alt="Rimshot trackpad zones: brightness on the left edge, volume on the right, the Touch Bar along the top, mute in the top-right corner" width="620">
+  <img src="docs/zones.svg" alt="Rimshot trackpad zones: the Touch Bar along the top edge and an optional media strip along the bottom" width="620">
 </p>
-
-The other edges do things too:
 
 | Where | Gesture | What happens |
 |---|---|---|
-| **Left edge** | Slide up or down | Display brightness |
-| **Right edge** | Slide up or down | Volume |
-| **Top-right corner** | Double-tap | Mute / unmute |
 | **Bottom edge** *(optional)* | Swipe left or right | Previous / next track |
 | **Bottom edge** *(optional)* | Tap | Play / pause |
-| **Any slider** | Hold <kbd>⇧</kbd> <kbd>⌥</kbd> while sliding | Quarter steps for fine control |
 
-You get the same volume and brightness overlay as your keyboard keys, and the cursor stays put while you slide. Two-finger scrolling, clicking and every other gesture work exactly as before.
+Two-finger scrolling, clicking and every other gesture work exactly as before.
 
 ## Tiny, native, yours to read
 
-- **Native Swift and AppKit.** The whole app is about 550 KB and uses about 30 MB of memory. No Electron.
+- **Native Swift and AppKit.** The whole app is about 540 KB and uses about 30 MB of memory. No Electron.
 - **0% CPU when idle.** Rimshot wakes up only when you touch the trackpad. The bar exists only while your finger is on the edge.
-- **Open source.** Rimshot needs Accessibility permission, so you should be able to see what it does: it's about 1,500 lines of Swift in one file.
+- **Open source.** Rimshot needs Accessibility permission, so you should be able to see what it does: it's about 1,300 lines of Swift in one file.
 
 ## Install
 
@@ -98,8 +92,6 @@ A slider icon appears in your menu bar. There's no Dock icon.
 Everything lives in the menu bar menu:
 
 - **Top Edge** and **Touch Bar**: turn Touch Bar off to make the top edge a plain keyboard light slider instead.
-- **Swap Sides**: brightness on the right, volume on the left.
-- **Bottom Quarter Only**: side slides only start from the lower 25% of the edges.
 - **Haptic Feedback**: the ticks and the charge-up rumble.
 - **Media Strip** and **Tap to Play**: track controls on the bottom edge, off by default.
 - **Open at Login**.
