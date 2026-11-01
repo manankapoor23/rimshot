@@ -15,6 +15,11 @@
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
+<p align="center">
+  <a href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg"><strong>Download Rimshot for Mac</strong></a>
+  &nbsp;·&nbsp; free &nbsp;·&nbsp; macOS 13 or later &nbsp;·&nbsp; <a href="#install">install notes</a>
+</p>
+
 Apple retired the Touch Bar, but the shortcuts were handy. Rimshot brings them back to every MacBook, including the ones that never had one.
 
 Rest a finger on the top edge of your trackpad and a Touch Bar appears on screen. Slide to pick a button, feel a tick on each one, and lift to press. Your eyes stay on your work, with no glancing down at the keyboard.
@@ -70,7 +75,20 @@ Two-finger scrolling, clicking and every other gesture work exactly as before.
 
 ## Install
 
-You'll need macOS 13 Ventura or later and a MacBook. Building takes about 30 seconds and needs only Apple's free Command Line Tools, not Xcode.
+1. **[Download Rimshot.dmg](https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg)**, open it, and drag Rimshot into **Applications**.
+2. Open Rimshot from Applications. macOS will say it *could not verify Rimshot is free of malware*. That's because the app isn't notarized by Apple yet, which requires a paid developer account. Click **Done**.
+3. Open **System Settings → Privacy & Security**, scroll down to the message about Rimshot, and click **Open Anyway**. Confirm with your password or Touch ID.
+
+You only do this once. If you're comfortable with Terminal, this does the same thing as step 3:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Rimshot.app
+```
+
+<details>
+<summary><strong>Or build it yourself</strong> (no warnings, about 30 seconds)</summary>
+
+You only need Apple's free Command Line Tools, not Xcode.
 
 ```bash
 xcode-select --install          # skip if you already have the Command Line Tools
@@ -79,7 +97,8 @@ cd rimshot && ./build.sh
 mv Rimshot.app /Applications/ && open /Applications/Rimshot.app
 ```
 
-Because you build it yourself, macOS won't show "unidentified developer" warnings.
+Apps you build yourself aren't quarantined, so macOS won't show the warning.
+</details>
 
 ### First launch
 
