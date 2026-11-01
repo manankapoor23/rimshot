@@ -10,128 +10,99 @@
 <meta property="og:image" content="https://mkap.me/rimshot/og.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='14' fill='%231b1d22'/%3E%3Crect x='14' y='17' width='36' height='3' rx='1.5' fill='%23f2f2f2'/%3E%3Ccircle cx='38' cy='18.5' r='4.5' fill='%230a6cff'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#faf5ec">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%231a6bff' d='M1 0h6v1H1z'/%3E%3Cpath fill='%23000' d='M0 1h1v6H0zM7 1h1v6H7zM1 7h6v1H1z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #ffffff;
-    --ink: #151515;
-    --ink-2: #4b4b4b;
-    --ink-3: #767676;
-    --line: #e7e7e5;
-    --pad: #f1f1ef;
-    --pad-edge: #e3e3e0;
-    --selected: #0a6cff;         /* the highlighted button, as in the app */
-    --screen: #1b1d22;
-    --screen-ink: #e9e9ea;
-    --hud: #2b2e35;
-    --key: rgba(255, 255, 255, 0.07);
-    --code-bg: #f4f4f2;
-    --serif: "Newsreader", Georgia, serif;
-    --sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --beige: hsl(39 50% 95%);
+    --beige-dark: hsl(39 28% 89%);
+    --black: #000;
+    --ink: #0b0b0b;
+    --accent: hsl(220 100% 55%);    /* the highlighted button, as in the app */
+    --muted-on-light: rgba(0, 0, 0, 0.42);
+    --muted-on-dark: rgba(250, 245, 236, 0.36);
+    --sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-    color-scheme: light dark;
+    --margin: clamp(1rem, 0.8rem + 0.76vw, 1.5rem);
+    --ease-out: cubic-bezier(.5, .6, 0, 1);
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #121212;
-      --ink: #f1f1f0;
-      --ink-2: #b9b9b6;
-      --ink-3: #8d8d8a;
-      --line: #2a2a29;
-      --pad: #1d1d1f;
-      --pad-edge: #2a2a2d;
-      --screen: #0c0d10;
-      --hud: #24272e;
-      --code-bg: #1b1b1b;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #121212; --ink: #f1f1f0; --ink-2: #b9b9b6; --ink-3: #8d8d8a; --line: #2a2a29;
-    --pad: #1d1d1f; --pad-edge: #2a2a2d; --screen: #0c0d10; --hud: #24272e; --code-bg: #1b1b1b;
-  }
-
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font: 17px/1.6 var(--sans);
-    -webkit-font-smoothing: antialiased;
+    margin: 0; background: var(--beige); color: var(--ink);
+    font: 500 17px/1.4 var(--sans); letter-spacing: -0.015em;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
   }
-  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-  a:hover { text-decoration-thickness: 2px; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-  @media (max-width: 520px) { .wrap { padding: 0 16px; } }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, p { margin: 0; }
+  .micro { font: 500 11px/1 var(--mono); letter-spacing: 0.02em; text-transform: uppercase; }
 
   /* Header */
-  header { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
-  .mark { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 500 22px/1 var(--serif); }
-  .mark svg { width: 26px; height: 26px; }
-  nav { display: flex; gap: 22px; font-size: 15px; }
-  nav a { text-decoration: none; color: var(--ink-2); }
-  nav a:hover { color: var(--ink); }
+  header {
+    position: fixed; inset: 0 0 auto; z-index: 50;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--margin); pointer-events: none;
+    transition: color 0.3s;
+  }
+  header > * { pointer-events: auto; }
+  header.on-dark { color: var(--beige); }
+  .nav { display: flex; align-items: center; gap: 2px; font-size: 14px; }
+  .nav a { padding: 6px 10px; border-radius: 999px; transition: background 0.2s; }
+  .nav a:hover { background: color-mix(in srgb, currentColor 9%, transparent); }
+  .logo { display: inline-flex; align-items: center; gap: 8px; margin-right: 6px; font-weight: 600; }
+  .logo svg { width: 18px; height: 18px; }
+  .get {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;
+    padding: 8px 14px; border-radius: 999px; background: var(--ink); color: var(--beige);
+    transition: background 0.3s, color 0.3s, transform 0.3s var(--ease-out);
+  }
+  header.on-dark .get { background: var(--beige); color: var(--ink); }
+  .get:hover { transform: scale(1.04); }
+  @media (max-width: 640px) { .nav .hide-sm { display: none; } }
 
-  /* Hero */
-  .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: center; padding: 48px 0 88px; }
-  @media (max-width: 900px) { .hero { grid-template-columns: minmax(0, 1fr); gap: 40px; padding-top: 24px; } }
-  .hero > *, .split > * { min-width: 0; }
-  h1 {
-    font: 400 clamp(40px, 5.4vw, 64px)/1.04 var(--serif);
-    letter-spacing: -0.015em;
-    margin: 0 0 22px;
+  /* Intro: the headline, and a black bar that grows into the demo */
+  .intro { position: relative; height: 260vh; }
+  .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
+  .headline { position: absolute; left: 0; right: 0; top: 19vh; text-align: center; padding: 0 var(--margin); will-change: transform, opacity; }
+  .display {
+    font: 700 clamp(4.2rem, 2.2rem + 8.4vw, 10rem)/0.92 var(--sans);
+    letter-spacing: -0.075em;
   }
-  .lede { font-size: 19px; color: var(--ink-2); margin: 0 0 32px; max-width: 30em; }
-  .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; }
-  .button {
-    display: inline-flex; align-items: center; gap: 10px;
-    background: var(--ink); color: var(--bg);
-    padding: 13px 20px; border-radius: 10px;
-    font-weight: 600; font-size: 16px; text-decoration: none;
+  .headline .micro { margin-top: 28px; color: var(--muted-on-light); }
+  .frame {
+    position: absolute; left: 50%; background: #121317; overflow: hidden;
+    transform: translateX(-50%); will-change: width, height, top;
   }
-  .button:hover { opacity: 0.88; }
-  .button svg { width: 16px; height: 16px; }
-  .meta { font-size: 14px; color: var(--ink-3); }
-  .note { font-size: 14px; color: var(--ink-3); margin-top: 18px; max-width: 30em; }
-
-  /* Demo */
-  .demo { user-select: none; -webkit-user-select: none; }
-  .screen {
-    position: relative; background: var(--screen); border-radius: 14px;
-    aspect-ratio: 16 / 9.4; overflow: hidden;
-  }
+  .frame .window, .frame .status { opacity: var(--inside, 0); }
   .window { position: absolute; left: 7%; top: 10%; width: 46%; height: 44%; border-radius: 8px; background: rgba(255,255,255,0.05); }
   .window::before { content: ""; position: absolute; inset: 0 0 auto; height: 15%; border-radius: 8px 8px 0 0; background: rgba(255,255,255,0.05); }
   .window.two { left: 58%; top: 18%; width: 34%; height: 33%; }
   .status {
-    position: absolute; left: 0; right: 0; bottom: 30%; text-align: center;
-    color: var(--screen-ink); font-size: 14px; opacity: 0.75; padding: 0 16px;
-    transition: opacity 0.2s;
+    position: absolute; left: 0; right: 0; bottom: calc(6% + 70px); text-align: center;
+    color: #e9e9ea; font-size: 14px; letter-spacing: -0.01em; padding: 0 16px;
   }
-  .status strong { font-weight: 600; opacity: 1; }
+  .status strong { font-weight: 700; }
   .bar {
-    position: absolute; left: 4%; right: 4%; bottom: 7%;
+    position: absolute; left: var(--bar-inset, 6px); right: var(--bar-inset, 6px); bottom: var(--bar-bottom, 6px);
     display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
-    padding: 7px; border-radius: 13px; background: var(--hud);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    padding: 6px; border-radius: 12px; background: #2a2d34;
     opacity: 0; transform: scale(0.94); transform-origin: 50% 100%;
     transition: opacity 0.14s ease-out, transform 0.18s ease-out;
   }
   .bar.fn { grid-template-columns: repeat(13, 1fr); gap: 4px; }
-  .bar.visible { opacity: 1; transform: none; }
+  .bar.visible, .frame.closed .bar { opacity: 1; transform: none; }
   .key {
-    position: relative; height: 40px; border-radius: 8px; background: var(--key);
-    display: grid; place-items: center; color: var(--screen-ink); overflow: hidden;
-    font: 500 13px var(--mono);
+    position: relative; height: 40px; border-radius: 8px; background: rgba(255,255,255,0.07);
+    display: grid; place-items: center; color: #e9e9ea; overflow: hidden;
+    font: 500 12px var(--mono); letter-spacing: 0;
   }
-  .bar.fn .key { font-size: 11px; height: 36px; }
-  .key svg { width: 20px; height: 20px; position: relative; }
+  .bar.fn .key { font-size: 10.5px; height: 36px; }
+  .key svg { width: 19px; height: 19px; position: relative; }
   .key span { position: relative; }
-  .key.selected { background: var(--selected); color: #fff; }
-  /* The hold charges as a glow growing from the middle of the button. */
+  .key.selected { background: var(--accent); color: #fff; }
   .key::after {
     content: ""; position: absolute; inset: 0; margin: auto; border-radius: 8px;
     background: rgba(255,255,255,0.32);
@@ -140,96 +111,153 @@
   .key.pressed { animation: press 0.32s ease-out; }
   @keyframes press { 40% { transform: scale(0.92); } }
   .bar.cancelling .key { opacity: 0.35; }
-  .bar.cancelling .key.selected { background: var(--key); color: var(--screen-ink); }
+  .bar.cancelling .key.selected { background: rgba(255,255,255,0.07); color: #e9e9ea; }
   .slider {
-    position: absolute; inset: 7px; display: none; align-items: center; gap: 14px;
-    padding: 0 14px; border-radius: 8px; background: rgba(10,108,255,0.28); color: var(--screen-ink);
-    font-size: 14px; font-weight: 600;
+    position: absolute; inset: 6px; display: none; align-items: center; gap: 14px;
+    padding: 0 14px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 30%, transparent);
+    color: #e9e9ea; font-size: 14px; font-weight: 700;
   }
-  .slider svg { width: 20px; height: 20px; flex: none; }
+  .slider svg { width: 19px; height: 19px; flex: none; }
   .track { position: relative; flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.22); }
-  .knob { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--selected); left: 50%; }
+  .knob { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--accent); left: 50%; }
   .bar.sliding .key { visibility: hidden; }
   .bar.sliding .slider { display: flex; }
 
-  .pad-row { display: flex; align-items: flex-start; gap: 18px; margin-top: 22px; }
+  .pad-wrap { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; opacity: 0; }
+  .pad-wrap.live { pointer-events: auto; }
   .pad {
-    position: relative; width: 62%; margin-left: 19%; aspect-ratio: 1.645;
-    background: var(--pad); border-radius: 14px; border: 1px solid var(--pad-edge);
-    touch-action: none; cursor: default;
+    position: relative; width: 100%; aspect-ratio: 1.645; margin: 0 auto;
+    background: hsl(39 20% 85%); border-radius: 14px; touch-action: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
   }
   .edge {
     position: absolute; left: 0; right: 0; top: 0; height: 18%;
-    border-radius: 13px 13px 0 0; border-bottom: 1px dashed var(--pad-edge);
+    border-radius: 14px 14px 0 0; border-bottom: 1px dashed rgba(0,0,0,0.14);
     transition: background 0.15s;
   }
-  .pad.near .edge, .pad.active .edge { background: color-mix(in srgb, var(--selected) 12%, transparent); }
+  .pad.near .edge, .pad.active .edge { background: color-mix(in srgb, var(--accent) 16%, transparent); }
   .finger {
     position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
-    background: color-mix(in srgb, var(--ink) 18%, transparent);
-    border: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+    background: rgba(0,0,0,0.16); border: 1.5px solid rgba(0,0,0,0.32);
     pointer-events: none; opacity: 0; transition: opacity 0.12s;
   }
   .pad.touching .finger { opacity: 1; }
-  .pad-label { font-size: 13px; color: var(--ink-3); margin-top: 2px; line-height: 1.4; }
-  .demo-controls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 16px; font-size: 13px; color: var(--ink-3); }
+  .demo-controls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 12px; color: var(--muted-on-light); }
   .fn-toggle {
-    font: 500 12px var(--mono); padding: 4px 9px; border-radius: 6px; cursor: pointer;
-    border: 1px solid var(--line); background: transparent; color: var(--ink-2);
+    font: 500 11px var(--mono); padding: 5px 9px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(0,0,0,0.18); background: transparent; color: var(--ink);
   }
-  .fn-toggle[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .fn-toggle[aria-pressed="true"] { background: var(--ink); color: var(--beige); border-color: var(--ink); }
 
-  /* Sections */
-  section { border-top: 1px solid var(--line); padding: 72px 0; }
-  .split { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 56px; }
-  @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); gap: 24px; } section { padding: 56px 0; } }
-  h2 { font: 400 clamp(28px, 3.2vw, 38px)/1.12 var(--serif); letter-spacing: -0.01em; margin: 0 0 14px; }
-  h3 { font: 500 22px/1.25 var(--serif); margin: 0 0 6px; }
-  .split p { margin: 0 0 16px; color: var(--ink-2); max-width: 34em; }
-  .statement { font: 400 clamp(26px, 3vw, 36px)/1.3 var(--serif); letter-spacing: -0.01em; max-width: 24em; margin: 0; }
-  .statement + p { color: var(--ink-2); margin: 22px 0 0; max-width: 36em; }
+  /* Dark statement with words that light up as you scroll */
+  .dark { background: var(--black); color: var(--beige); }
+  .statement { padding: 26vh var(--margin) 22vh; text-align: center; }
+  .statement h2 {
+    font: 600 clamp(2.2rem, 1.4rem + 3.4vw, 4.6rem)/1.02 var(--sans); letter-spacing: -0.06em;
+    max-width: 15em; margin: 0 auto;
+  }
+  .statement .w { color: var(--muted-on-dark); transition: color 0.35s; }
+  .statement .w.lit { color: var(--beige); }
+  .statement p { margin: 34px auto 0; max-width: 30em; color: var(--muted-on-dark); font-size: 18px; }
+  .pips { display: flex; gap: 6px; justify-content: center; margin-top: 30px; }
+  .pips i { width: 12px; height: 12px; border-radius: 3px; background: var(--muted-on-dark); }
+  .pips i:first-child { background: var(--accent); }
 
-  .steps { margin: 0; }
-  .steps div { display: grid; grid-template-columns: 7.5rem 1fr; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
-  .steps div:first-child { padding-top: 4px; }
-  .steps dt { font: 500 22px/1.3 var(--serif); }
-  .steps dd { margin: 0; color: var(--ink-2); }
-  @media (max-width: 520px) { .steps div { grid-template-columns: 1fr; gap: 2px; } }
-
-  .buttons { list-style: none; margin: 0; padding: 0; max-width: 34rem; }
-  .buttons li { display: flex; align-items: baseline; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-  .buttons svg { width: 19px; height: 19px; flex: none; position: relative; top: 3px; color: var(--ink); }
-  .buttons .esc { font: 500 12px var(--mono); width: 19px; flex: none; }
-  .buttons b { font-weight: 600; }
-  .buttons small { color: var(--ink-3); font-size: 14px; margin-left: auto; text-align: right; }
-  .split .fkeys { display: flex; flex-wrap: wrap; gap: 5px; margin: 26px 0 0; align-items: center; color: var(--ink-2); font-size: 15px; }
-  kbd, .cap {
-    font: 500 12px var(--mono); padding: 3px 7px; border-radius: 5px;
-    border: 1px solid var(--line); border-bottom-width: 2px; background: var(--bg); color: var(--ink);
+  /* The deck: eight buttons as playing cards */
+  .deck-section { padding: 6vh 0 24vh; overflow: hidden; }
+  .deck-head { text-align: center; padding: 0 var(--margin); }
+  .deck-head h2 { font: 600 clamp(2rem, 1.5rem + 1.9vw, 3.25rem)/1 var(--sans); letter-spacing: -0.06em; }
+  .deck-head p { margin-top: 14px; color: var(--muted-on-dark); }
+  .deck { position: relative; height: 470px; margin-top: 56px; }
+  .card {
+    --x: 0px; --y: 0px; --r: 0deg; --lift: 0px;
+    position: absolute; left: 50%; top: 40px; width: 214px; height: 304px; margin-left: -107px;
+    background: var(--beige); color: var(--ink); border-radius: 16px; padding: 16px;
+    transform: translate(var(--x), calc(var(--y) + var(--lift))) rotate(var(--r));
+    transform-origin: 50% 100%;
+    transition: transform 0.5s var(--ease-out), box-shadow 0.3s;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 18px 40px rgba(0,0,0,0.35);
+    display: flex; flex-direction: column; justify-content: space-between; cursor: default;
+  }
+  .card:hover { --lift: -26px; z-index: 9 !important; }
+  .card .corner { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .card .corner.flip { align-self: flex-end; }
+  .card .corner b { font-weight: 600; font-size: 15px; letter-spacing: -0.03em; }
+  .card .corner svg { width: 18px; height: 18px; }
+  .card .corner .esc { font: 500 12px var(--mono); }
+  .card .corner.flip { transform: rotate(180deg); }
+  .card .text { font-size: 13.5px; line-height: 1.25; letter-spacing: -0.02em; max-width: 13em; }
+  .card .text em { font-style: normal; color: var(--muted-on-light); }
+  .card.accent { background: var(--accent); color: #fff; }
+  .card.accent .text em { color: rgba(255,255,255,0.7); }
+  @media (max-width: 760px) {
+    .deck { height: 360px; margin-top: 40px; }
+    .card { width: 152px; height: 216px; margin-left: -76px; padding: 12px; border-radius: 12px; }
+    .card .corner b { font-size: 13px; }
+    .card .text { font-size: 12px; }
+  }
+  .fn-line { text-align: center; margin-top: 40px; color: var(--muted-on-dark); padding: 0 var(--margin); }
+  .fn-line .cap {
+    display: inline-block; font: 500 11px var(--mono); padding: 4px 7px; margin: 3px 1px; border-radius: 6px;
+    border: 1px solid rgba(250,245,236,0.22); color: var(--beige);
   }
 
-  ol.install { margin: 0; padding-left: 1.3em; color: var(--ink-2); }
-  ol.install li { padding: 6px 0 6px 6px; }
-  ol.install li::marker { font-family: var(--serif); color: var(--ink); }
-  ol.install b { color: var(--ink); font-weight: 600; }
-  pre {
-    margin: 14px 0 0; padding: 14px 16px; border-radius: 10px; background: var(--code-bg);
-    font: 13.5px/1.6 var(--mono); overflow-x: auto; color: var(--ink);
+  /* Light sections */
+  .block { padding: 18vh var(--margin); }
+  .big {
+    font: 600 clamp(2.4rem, 1.6rem + 3.6vw, 5.6rem)/1 var(--sans); letter-spacing: -0.065em;
+    max-width: 13em;
   }
-  details { margin-top: 26px; color: var(--ink-2); }
-  summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+  .big .m { color: var(--muted-on-light); }
+  .cols { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--margin); margin-top: 72px; }
+  .cols > div { grid-column: span 4; }
+  .cols .micro { display: block; color: var(--muted-on-light); margin-bottom: 14px; }
+  .cols p { color: rgba(0,0,0,0.72); max-width: 26em; }
+  .cols a { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  @media (max-width: 860px) { .cols > div { grid-column: span 12; } .cols { gap: 36px; } }
 
-  .faq h3 { font-size: 20px; margin-top: 26px; }
-  .faq h3:first-child { margin-top: 0; }
-  .faq p { margin: 0; }
+  .install .big { max-width: 12em; }
+  .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--margin); margin-top: 64px; }
+  .step { border-top: 1px solid rgba(0,0,0,0.14); padding-top: 16px; }
+  .step .micro { color: var(--muted-on-light); display: block; margin-bottom: 26px; }
+  .step p { color: rgba(0,0,0,0.75); }
+  .step b { color: var(--ink); font-weight: 700; }
+  @media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+  .terminal { margin-top: 48px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; color: rgba(0,0,0,0.6); font-size: 15px; }
+  code {
+    font: 500 13px var(--mono); letter-spacing: 0; background: var(--beige-dark); color: var(--ink);
+    padding: 9px 12px; border-radius: 10px; overflow-x: auto; max-width: 100%; white-space: nowrap;
+  }
+  .build { margin-top: 18px; color: rgba(0,0,0,0.6); font-size: 15px; }
+  .build a { text-decoration: underline; text-underline-offset: 3px; }
 
-  footer { border-top: 1px solid var(--line); padding: 64px 0 48px; }
-  .closing { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
-  .closing h2 { margin: 0; }
-  .fine { margin-top: 48px; font-size: 13px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .faq { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--margin); }
+  .faq h2 { grid-column: span 4; font: 600 clamp(2rem, 1.5rem + 1.9vw, 3.25rem)/1 var(--sans); letter-spacing: -0.06em; }
+  .faq .list { grid-column: span 8; }
+  details { border-top: 1px solid rgba(0,0,0,0.14); }
+  details:last-child { border-bottom: 1px solid rgba(0,0,0,0.14); }
+  summary {
+    list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 0; font-size: 21px; font-weight: 600; letter-spacing: -0.04em;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font: 500 20px var(--mono); transition: transform 0.3s var(--ease-out); }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { padding: 0 0 22px; color: rgba(0,0,0,0.72); max-width: 34em; }
+  details a { text-decoration: underline; text-underline-offset: 3px; }
+  @media (max-width: 860px) { .faq h2, .faq .list { grid-column: span 12; } }
+
+  /* Footer */
+  footer { padding: 18vh var(--margin) var(--margin); }
+  .bigget { display: block; text-align: center; }
+  .bigget .display { transition: color 0.3s; }
+  .bigget:hover .display { color: var(--accent); }
+  .bigget .micro { display: block; margin-top: 26px; color: var(--muted-on-dark); }
+  .fine { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; margin-top: 18vh; color: var(--muted-on-dark); font-size: 13px; }
+  .fine a:hover { color: var(--beige); }
 
   @media (prefers-reduced-motion: reduce) {
-    .bar, .edge, .finger, .status { transition: none; }
+    .bar, .card, .statement .w, .edge, .finger { transition: none; }
     .key.pressed { animation: none; }
   }
 </style>
@@ -272,173 +300,258 @@
     <symbol id="i-down" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/>
     </symbol>
+    <symbol id="logo" viewBox="0 0 8 8" shape-rendering="crispEdges">
+      <path fill="var(--accent)" d="M1 0h6v1H1z"/>
+      <path fill="currentColor" d="M0 1h1v6H0zM7 1h1v6H7zM1 7h6v1H1z"/>
+    </symbol>
   </defs>
 </svg>
 
-<div class="wrap">
-  <header>
-    <a class="mark" href="./">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#1b1d22"/><rect x="14" y="17" width="36" height="3" rx="1.5" fill="#f2f2f2"/><circle cx="38" cy="18.5" r="4.5" fill="#0a6cff"/></svg>
-      Rimshot
-    </a>
-    <nav>
-      <a href="#install">Install</a>
-      <a href="https://github.com/manankapoor23/rimshot">GitHub</a>
-    </nav>
-  </header>
+<header id="header">
+  <nav class="nav">
+    <a class="logo" href="./"><svg aria-hidden="true"><use href="#logo"/></svg>Rimshot</a>
+    <a class="hide-sm" href="#how">How</a>
+    <a class="hide-sm" href="#buttons">Buttons</a>
+    <a href="#install">Install</a>
+    <a class="hide-sm" href="https://github.com/manankapoor23/rimshot">GitHub</a>
+  </nav>
+  <a class="get" href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg">
+    <svg width="14" height="14" aria-hidden="true"><use href="#i-down"/></svg>Download
+  </a>
+</header>
 
-  <main>
-    <div class="hero">
-      <div>
-        <h1>The Touch Bar is back, on your trackpad.</h1>
-        <p class="lede">Rest a finger on the top edge of your trackpad and a row of buttons appears on screen. Slide to pick one, feel a tick as you cross each, and lift to press. Your eyes never leave your work.</p>
-        <div class="cta">
-          <a class="button" href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg">
-            <svg aria-hidden="true"><use href="#i-down"/></svg>Download for Mac
-          </a>
-          <span class="meta">Free · v0.1.0 · macOS 13 or later</span>
-        </div>
-        <p class="note">Rimshot isn't notarized by Apple yet, so macOS asks you to approve it once. <a href="#install">Here's how.</a></p>
+<main>
+  <section class="intro" id="intro">
+    <div class="stage" id="stage">
+      <div class="headline" id="headline">
+        <h1 class="display">The Touch Bar<br>is Back</h1>
+        <p class="micro">On your trackpad · Free · macOS 13+ · 540 KB</p>
       </div>
 
-      <div class="demo" id="demo">
-        <div class="screen" aria-hidden="true">
-          <div class="window"></div>
-          <div class="window two"></div>
-          <p class="status" id="status">Hover the top edge of the trackpad below.</p>
-          <div class="bar" id="bar">
-            <div class="slider" id="slider">
-              <svg id="slider-icon"><use href="#i-sun"/></svg>
-              <span id="slider-name">Brightness</span>
-              <div class="track"><div class="knob" id="knob"></div></div>
-            </div>
+      <div class="frame closed" id="frame" aria-hidden="true">
+        <div class="window"></div>
+        <div class="window two"></div>
+        <p class="status" id="status">Hover the top edge of the trackpad below.</p>
+        <div class="bar" id="bar">
+          <div class="slider" id="slider">
+            <svg id="slider-icon"><use href="#i-sun"/></svg>
+            <span id="slider-name">Brightness</span>
+            <div class="track"><div class="knob" id="knob"></div></div>
           </div>
         </div>
-        <div class="pad-row">
-          <div class="pad" id="pad" role="img" aria-label="A MacBook trackpad. Resting on its top edge shows the Touch Bar above.">
-            <div class="edge"></div>
-            <div class="finger" id="finger"></div>
-          </div>
+      </div>
+
+      <div class="pad-wrap" id="pad-wrap">
+        <div class="pad" id="pad" role="img" aria-label="A MacBook trackpad. Resting on its top edge shows the Touch Bar above.">
+          <div class="edge"></div>
+          <div class="finger" id="finger"></div>
         </div>
-        <div class="demo-controls">
-          <span id="demo-hint">Click to press. Hold the mouse button to charge.</span>
+        <div class="demo-controls micro">
+          <span id="demo-hint">Hover the edge · click · hold</span>
           <button class="fn-toggle" id="fn" type="button" aria-pressed="false" title="Show the function keys, like holding fn">fn</button>
         </div>
       </div>
     </div>
+  </section>
 
-    <section>
-      <div>
-        <p class="statement">The Touch Bar had good ideas and one real flaw: it was flat glass, so you had to look down to use it.</p>
-        <p>Rimshot moves the buttons to the screen, right where you're already looking, and puts the control under your finger, where you can feel it. It works on every MacBook with macOS 13 or later, including the Airs that never had a Touch Bar.</p>
-      </div>
+  <div class="dark" id="dark">
+    <section class="statement" id="how">
+      <h2 id="words">
+        <span class="w">Rest a finger on the edge.</span>
+        <span class="w">Slide to pick.</span>
+        <span class="w">Feel every tick.</span>
+        <span class="w">Lift to press.</span>
+        <span class="w">Hold, and it charges up.</span>
+      </h2>
+      <p>The Touch Bar was flat glass, so you had to look down to use it. Rimshot puts the buttons on your screen and the control under your finger, where you can feel it.</p>
+      <div class="pips" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     </section>
 
-    <section class="split">
-      <div>
-        <h2>How it feels</h2>
-        <p>Only a resting finger on the top edge opens the bar. Moving the cursor, scrolling and clicking everywhere else work exactly as they always have.</p>
+    <section class="deck-section" id="buttons">
+      <div class="deck-head">
+        <h2>Eight buttons, dealt.</h2>
+        <p>The ones people reached for most on the original.</p>
       </div>
-      <dl class="steps">
-        <div><dt>Rest</dt><dd>Leave a finger on the top edge for a moment. The bar fades in at the bottom of your screen.</dd></div>
-        <div><dt>Slide</dt><dd>The highlight follows your finger across the full width of the trackpad, with a haptic tick on each new button.</dd></div>
-        <div><dt>Lift</dt><dd>Lift to press the highlighted button, or press down on the trackpad to fire it right away.</dd></div>
-        <div><dt>Hold</dt><dd>Stay put and the ticks come faster and firmer while the button glows from its center outward. Then it fires on its own. On brightness, keyboard light and volume, it becomes a slider.</dd></div>
-        <div><dt>Let go</dt><dd>Changed your mind? Slide down into the trackpad and lift. Nothing happens.</dd></div>
-      </dl>
+      <div class="deck" id="deck"></div>
+      <p class="fn-line">Hold <span class="cap">fn</span> and the bar turns into
+        <span class="cap">esc</span><span class="cap">F1</span><span class="cap">F2</span><span class="cap">F3</span><span class="cap">…</span><span class="cap">F12</span>
+      </p>
     </section>
+  </div>
 
-    <section class="split">
+  <section class="block">
+    <h2 class="big">540 KB. <span class="m">Smaller than a screenshot of it, and asleep until you touch the trackpad.</span></h2>
+    <div class="cols">
       <div>
-        <h2>On the bar</h2>
-        <p>Eight buttons, the ones people reached for most on the original Touch Bar.</p>
+        <span class="micro">Native</span>
+        <p>Written in Swift with AppKit. No web view, no Electron, no background polling. It uses no CPU until a finger lands on the edge.</p>
       </div>
       <div>
-        <ul class="buttons">
-          <li><span class="esc">esc</span><b>Escape</b><small>the key the Touch Bar took away</small></li>
-          <li><svg><use href="#i-sun"/></svg><b>Brightness</b><small>hold, then slide</small></li>
-          <li><svg><use href="#i-kbd"/></svg><b>Keyboard light</b><small>hold, then slide</small></li>
-          <li><svg><use href="#i-mission"/></svg><b>Mission Control</b><small>every window at once</small></li>
-          <li><svg><use href="#i-shot"/></svg><b>Screenshot</b><small>opens the capture tool</small></li>
-          <li><svg><use href="#i-play"/></svg><b>Play / Pause</b><small>whatever's playing</small></li>
-          <li><svg><use href="#i-vol"/></svg><b>Volume</b><small>hold, then slide</small></li>
-          <li><svg><use href="#i-mute"/></svg><b>Mute</b><small>and unmute</small></li>
-        </ul>
-        <p class="fkeys">Hold <kbd>fn</kbd> and the bar turns into
-          <span class="cap">esc</span><span class="cap">F1</span><span class="cap">F2</span><span class="cap">F3</span><span class="cap">…</span><span class="cap">F12</span>
-        </p>
-      </div>
-    </section>
-
-    <section class="split">
-      <div>
-        <h2>Small on purpose</h2>
+        <span class="micro">Readable</span>
+        <p>Rimshot needs Accessibility permission to press keys for you, so you should be able to see exactly what it does. The whole app is one file of Swift, <a href="https://github.com/manankapoor23/rimshot/blob/main/main.swift">right here</a>.</p>
       </div>
       <div>
-        <p>Rimshot is 540 KB, smaller than a screenshot of it. It's written in Swift with AppKit, so there's no web view and no Electron, and it uses no CPU until you touch the trackpad.</p>
-        <p>It needs Accessibility permission to press keys for you, so you should be able to see exactly what it does. The whole app is one file of Swift, <a href="https://github.com/manankapoor23/rimshot/blob/main/main.swift">right here</a>. MIT licensed.</p>
+        <span class="micro">Every MacBook</span>
+        <p>Any MacBook with a Force Touch trackpad and macOS 13 or later, including the Airs that never had a Touch Bar. MIT licensed.</p>
       </div>
-    </section>
-
-    <section class="split" id="install">
-      <div>
-        <h2>Install</h2>
-        <p>Rimshot isn't notarized by Apple yet, which takes a paid developer account. Until it is, macOS asks you to approve it once.</p>
-      </div>
-      <div>
-        <ol class="install">
-          <li><a href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg"><b>Download Rimshot.dmg</b></a>, open it, and drag Rimshot into Applications.</li>
-          <li>Open Rimshot. macOS says it <i>could not verify</i> the app. Click <b>Done</b>.</li>
-          <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll to the message about Rimshot, and click <b>Open Anyway</b>.</li>
-          <li>When Rimshot asks for <b>Accessibility</b>, turn it on, then open Rimshot again. Its icon appears in your menu bar.</li>
-        </ol>
-        <p style="margin-top:18px">Comfortable in Terminal? This replaces step 3:</p>
-        <pre>xattr -dr com.apple.quarantine /Applications/Rimshot.app</pre>
-        <details>
-          <summary>Or build it yourself</summary>
-          <p style="margin-top:10px">Apps you build yourself skip the warning. You only need Apple's free Command Line Tools, not Xcode.</p>
-          <pre>git clone https://github.com/manankapoor23/rimshot.git
-cd rimshot &amp;&amp; ./build.sh
-mv Rimshot.app /Applications/</pre>
-        </details>
-      </div>
-    </section>
-
-    <section class="split faq">
-      <div>
-        <h2>Questions</h2>
-      </div>
-      <div>
-        <h3>Does it work on a MacBook Air?</h3>
-        <p>Yes. Any MacBook with a Force Touch trackpad and macOS 13 or later. That covers every MacBook since 2016.</p>
-        <h3>Why does it need Accessibility?</h3>
-        <p>To press keys like volume and escape for you, and to stop a tap on the bar from also clicking whatever is under your cursor. It doesn't read what you type.</p>
-        <h3>Can I pick my own buttons?</h3>
-        <p>Not yet. Custom buttons and per-app sets are next. If you have opinions, <a href="https://github.com/manankapoor23/rimshot/issues">open an issue</a>.</p>
-        <h3>Could a macOS update break it?</h3>
-        <p>Possibly. Reading finger positions takes a private Apple framework, since there's no public way to do it. If something stops working, please report it.</p>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="closing">
-      <h2>Bring the Touch Bar back.</h2>
-      <a class="button" href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg">
-        <svg aria-hidden="true"><use href="#i-down"/></svg>Download for Mac
-      </a>
     </div>
-    <div class="fine">
-      <span>Free and open source, MIT license.</span>
-      <a href="https://github.com/manankapoor23/rimshot">Source on GitHub</a>
-      <a href="https://github.com/manankapoor23/rimshot/releases">Release notes</a>
-      <span>Touch Bar and MacBook are trademarks of Apple Inc. Rimshot isn't affiliated with Apple.</span>
+  </section>
+
+  <section class="block install" id="install" style="padding-top: 4vh">
+    <h2 class="big">Install in a minute. <span class="m">macOS asks you to approve it once.</span></h2>
+    <div class="steps">
+      <div class="step"><span class="micro">01</span><p><a href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg"><b>Download Rimshot.dmg</b></a>, open it, and drag Rimshot into Applications.</p></div>
+      <div class="step"><span class="micro">02</span><p>Open it. macOS says it <i>could not verify</i> the app, because it isn't notarized yet. Click <b>Done</b>.</p></div>
+      <div class="step"><span class="micro">03</span><p>In <b>System Settings → Privacy &amp; Security</b>, click <b>Open Anyway</b> next to the Rimshot message.</p></div>
+      <div class="step"><span class="micro">04</span><p>Turn on <b>Accessibility</b> when Rimshot asks, then open it again. It lives in your menu bar.</p></div>
     </div>
-  </footer>
-</div>
+    <p class="terminal">Prefer Terminal? This replaces step 3: <code>xattr -dr com.apple.quarantine /Applications/Rimshot.app</code></p>
+    <p class="build">Or <a href="https://github.com/manankapoor23/rimshot#install">build it yourself</a> and skip the warning entirely.</p>
+  </section>
+
+  <section class="block faq" style="padding-top: 4vh">
+    <h2>Questions</h2>
+    <div class="list">
+      <details><summary>Why does it need Accessibility?</summary><p>To press keys like volume and escape for you, and to stop a tap on the bar from also clicking whatever is under your cursor. It doesn't read what you type.</p></details>
+      <details><summary>Can I pick my own buttons?</summary><p>Not yet. Custom buttons and per-app sets are next. If you have opinions, <a href="https://github.com/manankapoor23/rimshot/issues">open an issue</a>.</p></details>
+      <details><summary>Could a macOS update break it?</summary><p>Possibly. Reading finger positions takes a private Apple framework, since there's no public way to do it. If something stops working, please report it.</p></details>
+      <details><summary>Why isn't it notarized?</summary><p>Notarizing takes a paid Apple developer account. It's on the list. Until then, the Open Anyway step is a one-time thing.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer class="dark" id="footer">
+  <a class="bigget" href="https://github.com/manankapoor23/rimshot/releases/latest/download/Rimshot.dmg">
+    <span class="display">Get Rimshot</span>
+    <span class="micro">Download for Mac · v0.1.0 · free and open source</span>
+  </a>
+  <div class="fine">
+    <span>MIT license · <a href="https://github.com/manankapoor23/rimshot">Source</a> · <a href="https://github.com/manankapoor23/rimshot/releases">Releases</a></span>
+    <span>Touch Bar and MacBook are trademarks of Apple Inc. Rimshot isn't affiliated with Apple.</span>
+  </div>
+</footer>
 
 <script>
 (() => {
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+  /* ---------- Intro: the bar grows into the screen ---------- */
+  const intro = document.getElementById("intro");
+  const headline = document.getElementById("headline");
+  const frame = document.getElementById("frame");
+  const padWrap = document.getElementById("pad-wrap");
+  let demoLive = false;
+
+  function layoutIntro() {
+    const vw = innerWidth, vh = innerHeight;
+    const total = intro.offsetHeight - vh;
+    const raw = reduceMotion ? 1 : clamp(-intro.getBoundingClientRect().top / total);
+    const e = easeInOut(clamp(raw / 0.7));           // the last 30% holds the finished demo in place
+
+    // Closed: a Touch Bar under the headline. Open: the screen, with the trackpad below.
+    const closedW = Math.min(Math.max(vw * 0.46, 330), 640), closedH = 64;
+    const top0 = Math.min(vh * 0.19 + headline.querySelector(".display").offsetHeight + 90, vh - closedH - 40);
+    const padGap = 18, padLabel = 34;
+    let openW = Math.min(vw - 2 * 16, 1080);
+    let openH = openW * 9.4 / 16;
+    const avail = vh - 72 - 16;                         // below the header
+    const padRatio = vw < 760 ? 0.72 : 0.5;            // the trackpad, as a share of the screen width
+    if (openH + padGap + (openW * padRatio) / 1.645 + padLabel > avail) {
+      openW = (avail - padGap - padLabel) / (9.4 / 16 + padRatio / 1.645);
+      openH = openW * 9.4 / 16;
+    }
+    const padW = Math.min(openW * padRatio, 460), padH = padW / 1.645;
+    const top1 = 72 + Math.max(0, (avail - (openH + padGap + padH + padLabel)) / 2);
+
+    const w = closedW + (openW - closedW) * e;
+    const h = closedH + (openH - closedH) * e;
+    const t = top0 + (top1 - top0) * e;
+    frame.style.width = w + "px";
+    frame.style.height = h + "px";
+    frame.style.top = t + "px";
+    frame.style.borderRadius = (14 + 6 * e) + "px";
+    frame.style.setProperty("--inside", clamp((e - 0.55) / 0.35));
+    frame.style.setProperty("--bar-inset", (6 + (w * 0.04 - 6) * e) + "px");
+    frame.style.setProperty("--bar-bottom", (6 + (h * 0.06 - 6) * e) + "px");
+
+    headline.style.transform = `translateY(${-e * vh * 0.35}px) scale(${1 - e * 0.12})`;
+    headline.style.opacity = clamp(1 - e * 1.8);
+
+    padWrap.style.width = padW + "px";
+    padWrap.style.top = (t + h + padGap) + "px";
+    const padIn = clamp((e - 0.8) / 0.2);
+    padWrap.style.opacity = padIn;
+    padWrap.style.transform = `translateX(-50%) translateY(${(1 - padIn) * 24}px)`;
+
+    const open = e > 0.98;
+    frame.classList.toggle("closed", !open);
+    padWrap.classList.toggle("live", open);
+    if (open && !demoLive) { demoLive = true; startDemo(); }
+  }
+
+  /* ---------- Header colour over dark sections ---------- */
+  const header = document.getElementById("header");
+  const darks = [...document.querySelectorAll(".dark")];
+  function headerTone() {
+    const y = 28;
+    header.classList.toggle("on-dark", darks.some(d => { const r = d.getBoundingClientRect(); return r.top <= y && r.bottom > y; }));
+  }
+
+  /* ---------- Statement words light up ---------- */
+  const words = [...document.querySelectorAll(".statement .w")];
+  function lightWords() {
+    const line = innerHeight * 0.62;
+    words.forEach(w => w.classList.toggle("lit", reduceMotion || w.getBoundingClientRect().top < line));
+  }
+
+  /* ---------- The deck ---------- */
+  const CARDS = [
+    { name: "Escape", label: "esc", text: "The esc key. <em>The one the Touch Bar took away.</em>" },
+    { name: "Brightness", icon: "i-sun", text: "Display brightness. <em>Hold, then slide.</em>" },
+    { name: "Keyboard", icon: "i-kbd", text: "Keyboard light. <em>Hold, then slide.</em>" },
+    { name: "Mission", icon: "i-mission", text: "Mission Control. <em>Every window at once.</em>", accent: true },
+    { name: "Screenshot", icon: "i-shot", text: "Screenshot. <em>Opens the capture tool.</em>" },
+    { name: "Play", icon: "i-play", text: "Play / Pause. <em>Whatever's playing.</em>" },
+    { name: "Volume", icon: "i-vol", text: "Volume. <em>Hold, then slide.</em>" },
+    { name: "Mute", icon: "i-mute", text: "Mute. <em>And unmute.</em>" },
+  ];
+  const deck = document.getElementById("deck");
+  const cardEls = CARDS.map((c, i) => {
+    const el = document.createElement("div");
+    el.className = "card" + (c.accent ? " accent" : "");
+    const mark = c.icon ? `<svg><use href="#${c.icon}"/></svg>` : `<span class="esc">${c.label}</span>`;
+    el.innerHTML = `<div class="corner"><b>${c.name}</b>${mark}</div><p class="text">${c.text}</p><div class="corner flip"><b>${c.name}</b>${mark}</div>`;
+    el.style.zIndex = i;
+    deck.appendChild(el);
+    return el;
+  });
+  function dealCards() {
+    const r = deck.getBoundingClientRect();
+    const q = reduceMotion ? 1 : easeInOut(clamp((innerHeight - r.top) / (innerHeight * 0.85)));
+    const narrow = innerWidth < 760;
+    const spread = narrow ? Math.min(34, (innerWidth - 200) / 7) : Math.min(128, (innerWidth - 380) / 7);
+    const tilt = narrow ? 3.5 : 4.5;
+    cardEls.forEach((el, i) => {
+      const k = i - 3.5;
+      el.style.setProperty("--x", (k * spread * q) + "px");
+      el.style.setProperty("--y", (k * k * (narrow ? 2.5 : 4.5) * q) + "px");
+      el.style.setProperty("--r", (k * tilt * q) + "deg");
+    });
+  }
+
+  let ticking = false;
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { ticking = false; layoutIntro(); headerTone(); lightWords(); dealCards(); });
+  }
+  addEventListener("scroll", onScroll, { passive: true });
+  addEventListener("resize", onScroll);
+  layoutIntro(); headerTone(); lightWords(); dealCards();
+
+  /* ---------- The live demo (same behaviour as the app) ---------- */
   const ITEMS = [
     { name: "esc", label: "esc" },
     { name: "Brightness", icon: "i-sun", slider: true },
@@ -457,14 +570,12 @@ mv Rimshot.app /Applications/</pre>
   const pad = document.getElementById("pad");
   const finger = document.getElementById("finger");
   const status = document.getElementById("status");
-  const slider = document.getElementById("slider");
   const knob = document.getElementById("knob");
   const fnButton = document.getElementById("fn");
   const hint = document.getElementById("demo-hint");
   const canHover = matchMedia("(hover: hover)").matches;
-  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const idleText = canHover ? "Hover the top edge of the trackpad below." : "Touch and rest on the top edge of the trackpad below.";
-  if (!canHover) hint.textContent = "Lift to press. Rest still to charge.";
+  if (!canHover) hint.textContent = "Rest on the edge · lift · stay still";
   status.textContent = idleText;
 
   let items = ITEMS, keys = [];
@@ -478,9 +589,7 @@ mv Rimshot.app /Applications/</pre>
     keys = items.map(item => {
       const key = document.createElement("div");
       key.className = "key";
-      key.innerHTML = item.icon
-        ? `<svg><use href="#${item.icon}"/></svg>`
-        : `<span>${item.label}</span>`;
+      key.innerHTML = item.icon ? `<svg><use href="#${item.icon}"/></svg>` : `<span>${item.label}</span>`;
       bar.appendChild(key);
       return key;
     });
@@ -495,7 +604,7 @@ mv Rimshot.app /Applications/</pre>
     if (!sticky) statusTimer = setTimeout(() => { if (!shown) status.textContent = idleText; }, 1600);
   }
 
-  function tick() { if (navigator.vibrate) navigator.vibrate(6); }
+  function tick() { if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) navigator.vibrate(6); }
 
   function show() {
     dwellTimer = null;
@@ -511,7 +620,6 @@ mv Rimshot.app /Applications/</pre>
     stopCharge();
     pad.classList.remove("active");
     render();
-    // Keep a just-fired result on screen briefly; otherwise go back to the hint.
     if (statusSticky) setStatus(idleText, true);
   }
 
@@ -535,6 +643,7 @@ mv Rimshot.app /Applications/</pre>
     keys.forEach(k => k.style.removeProperty("--charge"));
   }
 
+  // The hold charges as a glow growing from the middle of the button, then fires.
   function chargeFrame(now) {
     if (!charging) return;
     if (!shown || cancelling || fired || sliding || index < 0) { stopCharge(); return; }
@@ -567,7 +676,7 @@ mv Rimshot.app /Applications/</pre>
       return render();
     }
     if (sliding) {
-      value = Math.max(0, Math.min(1, pos.x));
+      value = clamp(pos.x);
       return render();
     }
     cancelling = pos.y > CANCEL;
@@ -575,14 +684,14 @@ mv Rimshot.app /Applications/</pre>
       stopCharge();
       setStatus("Release to cancel.", true);
     } else {
-      const next = Math.max(0, Math.min(items.length - 1, Math.floor(pos.x * items.length)));
+      const next = clamp(Math.floor(pos.x * items.length), 0, items.length - 1);
       if (next !== index) {
         index = next;
         fired = false;
         stopCharge();
         holdAnchor = { ...pos };
         tick();
-        setStatus(items[index].name === "esc" ? "esc" : items[index].name, true);
+        setStatus(items[index].name, true);
       }
       // Touch charges by resting still, like the real thing; a mouse charges while the button is held.
       if (pointerType !== "mouse" && touching && holdAnchor) {
@@ -606,15 +715,21 @@ mv Rimshot.app /Applications/</pre>
 
   function locate(e) {
     const r = pad.getBoundingClientRect();
-    return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
-             y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)) };
+    return { x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height) };
+  }
+
+  // A finger leaving the trackpad: press, cancel, or finish a slider.
+  function lift() {
+    touching = false;
+    if (shown && !cancelling && !fired && !sliding && index >= 0) fire(items[index]);
+    else if (shown && cancelling) setStatus("Cancelled.");
+    else if (sliding) setStatus(`Set <strong>${sliding.name}</strong>.`);
+    pos = null; hide(); render();
   }
 
   pad.addEventListener("pointermove", e => { stopAutoplay(); pointerType = e.pointerType; pos = locate(e); update(); });
   pad.addEventListener("pointerenter", e => { stopAutoplay(); pointerType = e.pointerType; pos = locate(e); update(); });
-  pad.addEventListener("pointerleave", e => {
-    if (e.pointerType === "mouse") { pos = null; hide(); render(); }
-  });
+  pad.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") { pos = null; hide(); render(); } });
   pad.addEventListener("pointerdown", e => {
     stopAutoplay();
     pointerType = e.pointerType; pos = locate(e);
@@ -627,15 +742,6 @@ mv Rimshot.app /Applications/</pre>
       startCharge();
     }
   });
-  // A finger leaving the trackpad: press, cancel, or finish a slider.
-  function lift() {
-    touching = false;
-    if (shown && !cancelling && !fired && !sliding && index >= 0) fire(items[index]);
-    else if (shown && cancelling) setStatus("Cancelled.");
-    else if (sliding) setStatus(`Set <strong>${sliding.name}</strong>.`);
-    pos = null; hide(); render();
-  }
-
   pad.addEventListener("pointerup", e => {
     if (e.pointerType !== "mouse") { lift(); return; }
     const wasCharging = charging;
@@ -654,8 +760,7 @@ mv Rimshot.app /Applications/</pre>
     build();
   });
 
-  // Until someone touches the demo, it plays itself: rest, slide, hold to fire,
-  // then hold Volume into a slider.
+  // Until someone touches the demo, it plays itself.
   let autoplay = true;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   function glide(to, ms) {
@@ -663,8 +768,8 @@ mv Rimshot.app /Applications/</pre>
     return new Promise(done => {
       (function step(now) {
         if (!autoplay) return done();
-        const t = Math.min(1, (now - start) / ms), e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        pos = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
+        const t = Math.min(1, (now - start) / ms), k = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        pos = { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
         update();
         if (t < 1) requestAnimationFrame(step); else done();
       })(start);
@@ -678,7 +783,7 @@ mv Rimshot.app /Applications/</pre>
       await glide({ x: 0.27, y: 0.08 }, 600); if (!autoplay) return;
       await sleep(450); if (!autoplay) return;
       await glide({ x: 0.44, y: 0.09 }, 900); if (!autoplay) return;
-      await sleep(1300); if (!autoplay) return;          // holds on Mission Control until it fires
+      await sleep(1300); if (!autoplay) return;
       lift(); await sleep(1500); if (!autoplay) return;
 
       pos = { x: 0.62, y: 0.6 }; touching = true; update();
@@ -686,7 +791,7 @@ mv Rimshot.app /Applications/</pre>
       await glide({ x: 0.66, y: 0.08 }, 550); if (!autoplay) return;
       await sleep(400); if (!autoplay) return;
       await glide({ x: 0.81, y: 0.09 }, 600); if (!autoplay) return;
-      await sleep(1100); if (!autoplay) return;          // charges Volume into a slider
+      await sleep(1100); if (!autoplay) return;
       await glide({ x: 0.93, y: 0.1 }, 700); if (!autoplay) return;
       await glide({ x: 0.62, y: 0.1 }, 900); if (!autoplay) return;
       lift(); await sleep(1800);
@@ -698,15 +803,12 @@ mv Rimshot.app /Applications/</pre>
     touching = false; pos = null; hide(); render();
     pointerType = "mouse";
   }
-
-  build();
-  if (reduceMotion) {
-    autoplay = false;
-    shown = true; index = 3; render();
-    status.textContent = "Slide to pick a button.";
-  } else {
+  function startDemo() {
+    if (reduceMotion) { autoplay = false; return; }
     play();
   }
+
+  build();
 })();
 </script>
 </body>
