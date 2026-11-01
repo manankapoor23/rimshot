@@ -17,8 +17,9 @@ Everything you need to change, build and test Rimshot. For what the app does, se
 rimshot/
 ├── main.swift       # entire app: multitouch bindings, gestures, Touch Bar, media keys, menu, Trackpad View
 ├── build.sh         # compiles with swiftc, writes Info.plist, ad-hoc signs Rimshot.app
-├── docs/hero.svg    # README hero image
-├── docs/zones.svg   # README edge-slider diagram
+├── AppIcon.icns     # app icon, built from design/icons/12-pixel.svg by design/icons/make-icns.sh
+├── design/icons/    # icon concepts, the icon render script, and AI image prompts
+├── docs/            # the website (GitHub Pages) and README images
 ├── README.md        # user-facing page
 └── DEVELOPMENT.md   # this file
 ```

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs><clipPath id="b"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath></defs>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#25272c"/>
+<g clip-path="url(#b)">
+
+<rect x="262" y="290" width="500" height="470" rx="86" fill="#b9bbc0"/>
+<rect x="262" y="262" width="500" height="470" rx="86" fill="#ececee"/>
+<text x="512" y="560" text-anchor="middle" font-family="-apple-system, Helvetica Neue, Helvetica, Arial" font-size="190" font-weight="500" fill="#2a2c31" letter-spacing="-4">esc</text>
+</g>
+</svg>

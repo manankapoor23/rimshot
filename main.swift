@@ -1215,12 +1215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         UserDefaults.standard.register(defaults: Settings.defaults)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let image = NSImage(systemSymbolName: "slider.vertical.3", accessibilityDescription: "Rimshot") {
-            image.isTemplate = true
-            statusItem.button?.image = image
-        } else {
-            statusItem.button?.title = "ES"
-        }
+        statusItem.button?.image = menuBarIcon()
         menu.delegate = self
         statusItem.menu = menu
 
@@ -1239,6 +1234,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         touchBarHUD = TouchBarHUD()
         _ = startClickTap()
         if CommandLine.arguments.contains("--viewer") { showViewer() }
+    }
+
+    // The pixel-rim mark from the app icon as a template image: an 8x8 pixel square outline whose
+    // top edge (the trackpad's rim) is solid and whose other sides are faded.
+    private func menuBarIcon() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
+            let unit: CGFloat = 2, origin: CGFloat = 1
+            func cells(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, alpha: CGFloat) {
+                NSColor.black.withAlphaComponent(alpha).setFill()
+                NSRect(x: origin + x * unit, y: origin + y * unit, width: w * unit, height: h * unit).fill()
+            }
+            cells(1, 0, 6, 1, alpha: 1)
+            cells(0, 1, 1, 6, alpha: 0.5)
+            cells(7, 1, 1, 6, alpha: 0.5)
+            cells(1, 7, 6, 1, alpha: 0.5)
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Rimshot"
+        return image
     }
 
     func applicationWillTerminate(_ notification: Notification) {

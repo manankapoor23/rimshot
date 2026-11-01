@@ -7,7 +7,7 @@ APP="Rimshot.app"
 VERSION="0.1.0"
 
 rm -rf "$APP" build
-mkdir -p "$APP/Contents/MacOS" build
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" build
 
 for arch in arm64 x86_64; do
   echo "Compiling for ${arch}..."
@@ -29,6 +29,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <string>dev.rimshot.Rimshot</string>
   <key>CFBundleExecutable</key>
   <string>Rimshot</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -44,6 +46,9 @@ cat > "$APP/Contents/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
+
+# The icon is pre-built; regenerate it with design/icons/make-icns.sh.
+cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 codesign --force --sign - "$APP"
 echo "Built $APP"

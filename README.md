@@ -2,6 +2,10 @@
   <img src="docs/hero.svg" alt="A finger resting on the top edge of a MacBook trackpad brings up a Touch Bar on screen, with the Mission Control button highlighted and charging" width="760">
 </p>
 
+<p align="center">
+  <img src="design/icons/12-pixel.svg" alt="Rimshot icon" width="96">
+</p>
+
 <h1 align="center">Rimshot</h1>
 
 <p align="center">
