@@ -15,9 +15,10 @@ Everything you need to change, build and test Rimshot. For what the app does, se
 
 ```
 rimshot/
-├── main.swift       # entire app: multitouch bindings, gestures, media keys, menu, Trackpad View
+├── main.swift       # entire app: multitouch bindings, gestures, Touch Bar, media keys, menu, Trackpad View
 ├── build.sh         # compiles with swiftc, writes Info.plist, ad-hoc signs Rimshot.app
-├── docs/zones.svg   # README diagram
+├── docs/hero.svg    # README hero image
+├── docs/zones.svg   # README edge-slider diagram
 ├── README.md        # user-facing page
 └── DEVELOPMENT.md   # this file
 ```
@@ -69,11 +70,24 @@ Posting these events requires Accessibility permission (`AXIsProcessTrustedWithO
 - On lift in the corner zone, two quick taps within `DOUBLE_TAP_GAP` trigger mute.
 - Every AppKit call is dispatched to the main thread.
 
-### 4. Other APIs
+### 4. Touch Bar (top edge)
+
+- A touch that starts on the top edge shows the bar only after `BAR_DWELL` of resting. Drifting down more than `2 × EDGE_WIDTH` before that drops the gesture as a cursor move.
+- Once the bar is up, the finger's x position across the **full trackpad width** picks a button (`BAR_ITEMS`, or `FN_ITEMS` while Fn/Globe is held). Each new button gets a haptic tick, and the cursor is frozen.
+- Lift fires the highlighted button. A physical click while the bar is up fires it immediately. Sliding below `1 − BAR_CANCEL_DEPTH` cancels.
+- Holding still (within `BAR_HOLD_MOVE`) charges the button. Haptics fire at the `BAR_CHARGE_TICKS` fractions of `BAR_HOLD`, getting closer together and moving from `.alignment` to `.generic` to `.levelChange`. A full charge plays a double `.levelChange` and fires the button, or turns a slider button into a slider driven by `TOP_STEP` of horizontal travel.
+- The overlay is a borderless, non-activating `NSPanel` (`TouchBarHUD`) that ignores the mouse. It's updated from `Gestures` only when its `BarState` changes.
+- Buttons are `BarItem`s with a `BarAction`: a virtual key code, a media key, an app to open, or a slider. Mission Control and Screenshot open their apps in `/System/Applications`.
+
+### 5. Click swallowing
+
+A session-level `CGEventTap` on left mouse down, drag and up asks `Gestures.shouldSwallow`. It drops clicks while the bar is up, for `CLICK_GRACE` after the bar closes (to catch tap-to-click), and during a tap in the mute corner. A real click on the top edge before the bar appears passes through and cancels the gesture. Mouse-up is only swallowed when the matching mouse-down was. Creating the tap needs Accessibility permission, so it's retried each time the menu opens until it succeeds.
+
+### 6. Other APIs
 
 - Haptics use `NSHapticFeedbackManager.defaultPerformer.perform(.alignment, ...)`.
 - Cursor freeze uses `CGAssociateMouseAndMouseCursorPosition(0/1)`. The position is saved on touch-down and restored with `CGWarpMouseCursorPosition` on the first step.
-- Settings are stored in `UserDefaults`, with keys `swapSides`, `bottomQuarter`, `haptics`, `mediaStrip`, `tapToPlay` and `topEdge`.
+- Settings are stored in `UserDefaults`, with keys `swapSides`, `bottomQuarter`, `haptics`, `mediaStrip`, `tapToPlay`, `topEdge` and `touchBar`.
 - Login items use `SMAppService.mainApp.register()` and `unregister()`.
 
 ### Tuning constants (top of `main.swift`)
@@ -89,6 +103,12 @@ Posting these events requires Accessibility permission (`AXIsProcessTrustedWithO
 | `DOUBLE_TAP_GAP` | 0.40 s | Longest gap between taps for a double-tap |
 | `TAP_MAX_MOVE` | 0.02 | Farthest a finger can move and still count as a tap |
 | `BOTTOM_QUARTER` | 0.25 | Height of the active band for Bottom Quarter Only |
+| `BAR_DWELL` | 0.15 s | Rest time on the top edge before the Touch Bar appears |
+| `BAR_HOLD` | 0.70 s | Hold time to fire a button or start a slider |
+| `BAR_CHARGE_TICKS` | 0.25 … 0.97 | Fractions of `BAR_HOLD` where charge-up haptics fire |
+| `BAR_HOLD_MOVE` | 0.015 | Farthest a finger can drift and still count as holding |
+| `BAR_CANCEL_DEPTH` | 0.30 | How far down from the top cancels the Touch Bar |
+| `CLICK_GRACE` | 0.35 s | How long after a lift a tap-to-click still gets swallowed |
 
 ---
 
@@ -125,7 +145,14 @@ Every rebuild changes the ad-hoc signature, so macOS may silently stop trusting 
 - [ ] Sliding the left edge up and down changes brightness and shows the native display
 - [ ] Sliding the right edge up and down changes volume and shows the native display
 - [ ] Shift+Option while sliding gives quarter steps
-- [ ] Sliding along the top edge changes the keyboard backlight and shows the native display
+- [ ] Resting on the top edge shows the Touch Bar; a quick touch doesn't
+- [ ] Sliding moves the highlight with a tick per button; lifting presses it
+- [ ] Holding a button charges with quickening haptics and then fires it
+- [ ] Holding Brightness, Keyboard Light or Volume turns it into a working slider
+- [ ] Holding Fn/Globe shows esc and F1–F12, and they send the right keys
+- [ ] Sliding down cancels without pressing anything
+- [ ] Taps and presses on the bar never click whatever is under the cursor
+- [ ] With Touch Bar off, sliding along the top edge changes the keyboard backlight
 - [ ] Double-tapping the top-right corner toggles mute
 - [ ] A bottom-edge swipe right or left skips to the next or previous track (test with Spotify or Music)
 - [ ] Bottom-edge swipes do nothing while Media Strip is off
@@ -141,6 +168,8 @@ Every rebuild changes the ad-hoc signature, so macOS may silently stop trusting 
 
 ## Roadmap
 
+- [ ] Custom Touch Bar buttons, including running a Shortcut
+- [ ] Per-app Touch Bar button sets
 - [ ] A settings window (SwiftUI) with sliders for the tuning constants
 - [ ] An optional modifier key that must be held for edge sliding to work
 - [ ] Live brightness and volume levels shown in the menu

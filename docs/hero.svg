@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 730" width="1000" height="730" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <clipPath id="sel">
+      <rect x="430.5" y="306" width="69.5" height="36" rx="8"/>
+    </clipPath>
+    <clipPath id="pad">
+      <rect x="300" y="440" width="400" height="243" rx="18"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1000" height="730" rx="28" fill="#0f1115"/>
+
+  <!-- screen -->
+  <rect x="150" y="40" width="700" height="330" rx="16" fill="#1a1d24" stroke="#2c313a" stroke-width="2"/>
+  <!-- faint windows on the desktop -->
+  <rect x="200" y="80" width="330" height="180" rx="10" fill="#232731"/>
+  <rect x="200" y="80" width="330" height="26" rx="10" fill="#2a2f3a"/>
+  <circle cx="218" cy="93" r="5" fill="#ff5f57"/><circle cx="234" cy="93" r="5" fill="#febc2e"/><circle cx="250" cy="93" r="5" fill="#28c840"/>
+  <rect x="560" y="110" width="240" height="140" rx="10" fill="#20242d"/>
+
+  <!-- the on-screen Touch Bar -->
+  <rect x="190" y="298" width="620" height="52" rx="14" fill="#2b2f39" stroke="#3d4350" stroke-width="1"/>
+  <g font-size="13" font-weight="600" text-anchor="middle" fill="#d9dce3">
+    <rect x="200" y="306" width="69.5" height="36" rx="8" fill="#ffffff" fill-opacity="0.07"/>
+    <text x="234.75" y="329">esc</text>
+    <rect x="277" y="306" width="69.5" height="36" rx="8" fill="#ffffff" fill-opacity="0.07"/>
+    <text x="311.75" y="330" font-size="17">☀︎</text>
+    <rect x="353.75" y="306" width="69.5" height="36" rx="8" fill="#ffffff" fill-opacity="0.07"/>
+    <text x="388.5" y="329">Kbd</text>
+    <!-- highlighted, charging -->
+    <rect x="430.5" y="306" width="69.5" height="36" rx="8" fill="#0a84ff"/>
+    <rect x="430.5" y="322" width="69.5" height="20" fill="#ffffff" fill-opacity="0.3" clip-path="url(#sel)"/>
+    <text x="465.25" y="325" fill="#ffffff" font-size="12">Mission</text>
+    <text x="465.25" y="338" fill="#ffffff" font-size="8.5" font-weight="500">hold…</text>
+    <rect x="507.25" y="306" width="69.5" height="36" rx="8" fill="#ffffff" fill-opacity="0.07"/>
+    <text x="542" y="329">Shot</text>
+    <rect x="584" y="306" width="69.5" height="36" rx="8" fill="#ffffff" fill-opacity="0.07"/>
+    <text x="618.75" y="329">▶❙❙</text>
+    <rect x="660.75" y="306" width="69.5" height="36" rx="8" fill="#ffffff" fill-opacity="0.07"/>
+    <text x="695.5" y="329">Vol</text>
+    <rect x="737.5" y="306" width="69.5" height="36" rx="8" fill="#ffffff" fill-opacity="0.07"/>
+    <text x="772.25" y="329">Mute</text>
+  </g>
+
+  <!-- link from finger to the highlighted button -->
+  <path d="M475,432 C475,405 465,390 465,356" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round"/>
+
+  <!-- trackpad -->
+  <rect x="300" y="440" width="400" height="243" rx="18" fill="#1b1e25"/>
+  <g clip-path="url(#pad)">
+    <rect x="300" y="440" width="400" height="26" fill="#30d158" fill-opacity="0.32"/>
+    <g stroke="#30d158" stroke-opacity="0.55" stroke-width="1">
+      <line x1="350" y1="440" x2="350" y2="466"/><line x1="400" y1="440" x2="400" y2="466"/>
+      <line x1="450" y1="440" x2="450" y2="466"/><line x1="500" y1="440" x2="500" y2="466"/>
+      <line x1="550" y1="440" x2="550" y2="466"/><line x1="600" y1="440" x2="600" y2="466"/>
+      <line x1="650" y1="440" x2="650" y2="466"/>
+    </g>
+  </g>
+  <rect x="300" y="440" width="400" height="243" rx="18" fill="none" stroke="#3a3f4a" stroke-width="2"/>
+  <text x="500" y="575" text-anchor="middle" fill="#5d6472" font-size="15">the rest of your trackpad works as usual</text>
+
+  <!-- finger resting on the top edge -->
+  <circle cx="475" cy="453" r="13" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="475" cy="453" r="21" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2"/>
+  <circle cx="475" cy="453" r="29" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
+
+  <!-- annotations -->
+  <text x="725" y="458" fill="#30d158" font-size="13" font-weight="600">← rest a finger here</text>
+  <text x="866" y="320" fill="#8a909c" font-size="12">Touch Bar,</text>
+  <text x="866" y="336" fill="#8a909c" font-size="12">on screen</text>
+
+  <text x="500" y="712" text-anchor="middle" fill="#8a909c" font-size="15">Rest on the top edge  ·  slide to pick  ·  lift to press  ·  hold to charge it up</text>
+</svg>

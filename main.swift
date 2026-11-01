@@ -16,6 +16,13 @@ let TAP_MAX_TIME: Double = 0.25     // longest touch that still counts as a tap
 let DOUBLE_TAP_GAP: Double = 0.40   // longest gap between taps for a double-tap
 let TAP_MAX_MOVE: Float = 0.02      // farthest a finger can wander and still count as a tap
 let BOTTOM_QUARTER: Float = 0.25    // height of the active band when Bottom Quarter Only is on
+let BAR_DWELL: Double = 0.15        // how long a finger rests on the top edge before the Touch Bar appears
+let BAR_HOLD: Double = 0.70         // hold a button this long to fire it (or start adjusting a slider)
+// Points in the hold (fractions of BAR_HOLD) where a charge-up haptic fires; they get closer together.
+let BAR_CHARGE_TICKS: [Double] = [0.25, 0.45, 0.60, 0.71, 0.80, 0.87, 0.93, 0.97]
+let BAR_HOLD_MOVE: Float = 0.015    // farthest a finger can drift and still count as holding
+let BAR_CANCEL_DEPTH: Float = 0.30  // slide this far down from the top to cancel the Touch Bar
+let CLICK_GRACE: Double = 0.35      // how long after a lift a tap-to-click still gets swallowed
 
 let DEBUG = ProcessInfo.processInfo.environment["RIMSHOT_DEBUG"] != nil
 
@@ -132,6 +139,22 @@ enum Haptics {
     static func tick() {
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
+
+    // One tick of a hold charging up: lighter patterns early, firmer ones near the end.
+    static func charge(_ step: Int, of total: Int) {
+        let pattern: NSHapticFeedbackManager.FeedbackPattern =
+            step * 3 <= total ? .alignment : (step * 3 <= total * 2 ? .generic : .levelChange)
+        NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
+    }
+
+    // The hold is complete: a firm double bump.
+    static func thump() {
+        let performer = NSHapticFeedbackManager.defaultPerformer
+        performer.perform(.levelChange, performanceTime: .now)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            performer.perform(.levelChange, performanceTime: .now)
+        }
+    }
 }
 
 enum Cursor {
@@ -166,10 +189,11 @@ struct Settings {
     var mediaStrip: Bool
     var tapToPlay: Bool
     var topEdge: Bool
+    var touchBar: Bool
 
     static let defaults: [String: Any] = [
         "swapSides": false, "bottomQuarter": false, "haptics": true,
-        "mediaStrip": false, "tapToPlay": false, "topEdge": true,
+        "mediaStrip": false, "tapToPlay": false, "topEdge": true, "touchBar": true,
     ]
 
     static func load() -> Settings {
@@ -180,8 +204,85 @@ struct Settings {
             haptics: d.bool(forKey: "haptics"),
             mediaStrip: d.bool(forKey: "mediaStrip"),
             tapToPlay: d.bool(forKey: "tapToPlay"),
-            topEdge: d.bool(forKey: "topEdge"))
+            topEdge: d.bool(forKey: "topEdge"),
+            touchBar: d.bool(forKey: "touchBar"))
     }
+}
+
+// MARK: - Touch Bar buttons
+
+enum BarAction {
+    case key(CGKeyCode, CGEventFlags)
+    case media(Int32)
+    case open(String)
+    case slider(up: Int32, down: Int32)
+}
+
+struct BarItem {
+    let title: String
+    let short: String
+    let symbol: String?
+    let action: BarAction
+
+    var isSlider: Bool {
+        if case .slider = action { return true }
+        return false
+    }
+}
+
+let BAR_ITEMS: [BarItem] = [
+    BarItem(title: "esc", short: "esc", symbol: nil, action: .key(53, [])),
+    BarItem(title: "Brightness", short: "Bright", symbol: "sun.max.fill",
+            action: .slider(up: KEY_BRIGHTNESS_UP, down: KEY_BRIGHTNESS_DOWN)),
+    BarItem(title: "Keyboard Light", short: "Kbd", symbol: "light.max",
+            action: .slider(up: KEY_ILLUMINATION_UP, down: KEY_ILLUMINATION_DOWN)),
+    BarItem(title: "Mission Control", short: "Mission", symbol: "rectangle.3.group",
+            action: .open("/System/Applications/Mission Control.app")),
+    BarItem(title: "Screenshot", short: "Shot", symbol: "camera.viewfinder",
+            action: .open("/System/Applications/Utilities/Screenshot.app")),
+    BarItem(title: "Play / Pause", short: "Play", symbol: "playpause.fill", action: .media(KEY_PLAY)),
+    BarItem(title: "Volume", short: "Vol", symbol: "speaker.wave.2.fill",
+            action: .slider(up: KEY_SOUND_UP, down: KEY_SOUND_DOWN)),
+    BarItem(title: "Mute", short: "Mute", symbol: "speaker.slash.fill", action: .media(KEY_MUTE)),
+]
+
+// esc and F1–F12 while Fn (Globe) is held, like the Touch Bar.
+let FN_KEY_CODES: [CGKeyCode] = [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111]
+let FN_ITEMS: [BarItem] = [BarItem(title: "esc", short: "esc", symbol: nil, action: .key(53, []))]
+    + FN_KEY_CODES.enumerated().map { i, code in
+        BarItem(title: "F\(i + 1)", short: "F\(i + 1)", symbol: nil, action: .key(code, .maskSecondaryFn))
+    }
+
+enum Keys {
+    static func press(_ key: CGKeyCode, flags: CGEventFlags) {
+        for down in [true, false] {
+            let event = CGEvent(keyboardEventSource: nil, virtualKey: key, keyDown: down)
+            event?.flags = flags
+            event?.post(tap: .cghidEventTap)
+        }
+    }
+}
+
+// Main thread only.
+func perform(_ item: BarItem) {
+    switch item.action {
+    case let .key(key, flags): Keys.press(key, flags: flags)
+    case let .media(key): MediaKeys.press(key)
+    case let .open(path): NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    case .slider: break
+    }
+}
+
+// What the on-screen bar should show.
+struct BarState: Equatable {
+    var visible = false
+    var fn = false
+    var index = -1
+    var slider = false
+    var cancelling = false
+    var steps = 0
+    var charge = 0          // 0...10, how far a hold has charged
+    var pressed = false     // the button already fired during this touch
 }
 
 // MARK: - Gesture state machine
@@ -207,6 +308,25 @@ final class Gestures {
     private var stepped = false
     private var lastCornerTap: Double = 0
     private var observing = false   // true while the trackpad viewer is open
+
+    // Touch Bar
+    private var barShown = false
+    private var barFn = false
+    private var barIndex = -1
+    private var barHoldStart: Double = 0
+    private var barHoldX: Float = 0
+    private var barHoldTicks = 0
+    private var barCharge = 0
+    private var barSliderItem: BarItem?
+    private var barSteps = 0
+    private var barCancelling = false
+    private var barFired = false
+    private var barState = BarState()
+
+    // Click swallowing (see shouldSwallow)
+    private var swallowClicksUntil: Double = 0
+    private var cornerClickWindow: Double = 0
+    private var swallowedDown = false
 
     func setObserving(_ on: Bool) {
         lock.lock()
@@ -247,7 +367,7 @@ final class Gestures {
         case (.idle, 1):
             begin(contact!, device: device, now: now)
         case (.tracking, 1):
-            move(contact!)
+            move(contact!, now: now)
         default:
             break
         }
@@ -282,10 +402,20 @@ final class Gestures {
         startTime = now
         maxMove = 0
         stepped = false
+        barShown = false
+        barIndex = -1
+        barSliderItem = nil
+        barSteps = 0
+        barCancelling = false
+        barFired = false
+        barHoldTicks = 0
+        barCharge = 0
+        // A tap in the corner also makes a tap-to-click; swallow it unless this turns into a slide.
+        if zone == .corner { cornerClickWindow = now + TAP_MAX_TIME + CLICK_GRACE }
         if zone != .bottom { DispatchQueue.main.async { Cursor.remember() } }
     }
 
-    private func move(_ touch: MTTouch) {
+    private func move(_ touch: MTTouch, now: Double) {
         guard touch.identifier == fingerID else {
             cancel()
             phase = .ignoring
@@ -295,12 +425,15 @@ final class Gestures {
         lastPos = p
         maxMove = max(maxMove, hypot(p.x - startPos.x, p.y - startPos.y))
 
+        if zone == .corner && (maxMove > TAP_MAX_MOVE || now - startTime > TAP_MAX_TIME) {
+            cornerClickWindow = 0
+        }
         // A vertical slide that starts in the corner works as the right edge.
         if zone == .corner && !settings.bottomQuarter && abs(p.y - anchorY) >= STEP {
             zone = .right
         }
         if zone == .top {
-            slideTop(p)
+            if settings.touchBar { moveBar(p, now) } else { slideTop(p) }
             return
         }
         guard zone == .left || zone == .right else { return }
@@ -318,7 +451,7 @@ final class Gestures {
         while dy <= -STEP { step(up: false); anchorY -= STEP; dy += STEP }
     }
 
-    // Top edge: a horizontal slider, right is up.
+    // Top edge without Touch Bar mode: a horizontal keyboard light slider, right is up.
     private func slideTop(_ p: MTPoint) {
         if !stepped && abs(p.y - startPos.y) > 2 * EDGE_WIDTH {
             if DEBUG { NSLog("Rimshot: finger left the top edge, ignoring") }
@@ -331,12 +464,122 @@ final class Gestures {
         while dx <= -TOP_STEP { step(up: false); anchorX -= TOP_STEP; dx += TOP_STEP }
     }
 
-    private func step(up: Bool) {
+    // Top edge in Touch Bar mode: rest to show the bar, slide to pick, lift to press,
+    // hold a slider button to adjust it.
+    private func moveBar(_ p: MTPoint, _ now: Double) {
+        if !barShown {
+            if abs(p.y - startPos.y) > 2 * EDGE_WIDTH {
+                if DEBUG { NSLog("Rimshot: finger left the top edge before the bar appeared, ignoring") }
+                report("Ignored: moved down (cursor move)")
+                phase = .ignoring
+                return
+            }
+            guard now - startTime >= BAR_DWELL else { return }
+            barShown = true
+            if DEBUG { NSLog("Rimshot: touch bar shown") }
+            DispatchQueue.main.async { Cursor.freeze() }
+        }
+
+        if let item = barSliderItem, case let .slider(upKey, downKey) = item.action {
+            var dx = p.x - anchorX
+            while dx >= TOP_STEP {
+                step(up: true, keys: (upKey, downKey, item.title)); barSteps += 1
+                anchorX += TOP_STEP; dx -= TOP_STEP
+            }
+            while dx <= -TOP_STEP {
+                step(up: false, keys: (upKey, downKey, item.title)); barSteps -= 1
+                anchorX -= TOP_STEP; dx += TOP_STEP
+            }
+            updateBar()
+            return
+        }
+
+        let fn = CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn)
+        let items = fn ? FN_ITEMS : BAR_ITEMS
+        let index = min(items.count - 1, max(0, Int(p.x * Float(items.count))))
+        barCancelling = p.y < 1 - BAR_CANCEL_DEPTH
+
+        if barCancelling {
+            resetHold(now, p.x)
+        } else if index != barIndex || fn != barFn {
+            barIndex = index
+            barFn = fn
+            resetHold(now, p.x)
+            if settings.haptics { DispatchQueue.main.async { Haptics.tick() } }
+        } else if abs(p.x - barHoldX) >= BAR_HOLD_MOVE {
+            resetHold(now, p.x)
+        } else if !barFired {
+            charge(items[index], now: now, x: p.x)
+        }
+        updateBar()
+    }
+
+    private func resetHold(_ now: Double, _ x: Float) {
+        barHoldStart = now
+        barHoldX = x
+        barHoldTicks = 0
+        barCharge = 0
+    }
+
+    // Holding still on a button charges it up with quickening haptics, then fires it.
+    private func charge(_ item: BarItem, now: Double, x: Float) {
+        let progress = (now - barHoldStart) / BAR_HOLD
+        let due = BAR_CHARGE_TICKS.filter { progress >= $0 }.count
+        if due > barHoldTicks {
+            barHoldTicks = due
+            if settings.haptics {
+                DispatchQueue.main.async { Haptics.charge(due, of: BAR_CHARGE_TICKS.count) }
+            }
+        }
+        barCharge = progress < BAR_CHARGE_TICKS[0] ? 0 : min(10, Int(progress * 10))
+        guard progress >= 1 else { return }
+
+        if settings.haptics { DispatchQueue.main.async { Haptics.thump() } }
+        barCharge = 0
+        if item.isSlider {
+            barSliderItem = item
+            anchorX = x
+            barSteps = 0
+            report("Touch Bar: adjusting \(item.title)")
+        } else {
+            barFired = true
+            fire(item)
+        }
+    }
+
+    private func fire(_ item: BarItem) {
+        if item.isSlider {
+            report("Touch Bar: hold \(item.title) to adjust")
+            return
+        }
+        if DEBUG { NSLog("Rimshot: touch bar %@", item.title) }
+        report("Touch Bar: \(item.title)")
+        DispatchQueue.main.async { perform(item) }
+    }
+
+    private func updateBar() {
+        let state = BarState(visible: barShown, fn: barFn, index: barIndex, slider: barSliderItem != nil,
+                             cancelling: barCancelling, steps: barSteps, charge: barCharge, pressed: barFired)
+        guard state != barState else { return }
+        barState = state
+        DispatchQueue.main.async { touchBarHUD?.update(state) }
+    }
+
+    private func hideBar() {
+        barShown = false
+        barSliderItem = nil
+        updateBar()
+    }
+
+    private func step(up: Bool, keys: (up: Int32, down: Int32, name: String)? = nil) {
         let first = !stepped
         stepped = true
         let key: Int32
         let name: String
-        if zone == .top {
+        if let keys {
+            key = up ? keys.up : keys.down
+            name = keys.name
+        } else if zone == .top {
             key = up ? KEY_ILLUMINATION_UP : KEY_ILLUMINATION_DOWN
             name = "Keyboard light"
         } else if (zone == .left) != settings.swapSides {
@@ -360,6 +603,16 @@ final class Gestures {
     private func lift(_ now: Double) {
         let isTap = now - startTime <= TAP_MAX_TIME && maxMove <= TAP_MAX_MOVE
         switch zone {
+        case .top where settings.touchBar:
+            guard barShown else { break }
+            swallowClicksUntil = now + CLICK_GRACE
+            if barCancelling {
+                report("Touch Bar: cancelled")
+            } else if barSliderItem == nil && !barFired && barIndex >= 0 {
+                fire((barFn ? FN_ITEMS : BAR_ITEMS)[barIndex])
+            }
+            hideBar()
+            DispatchQueue.main.async { Cursor.release() }
         case .left, .right, .top:
             if stepped { DispatchQueue.main.async { Cursor.release() } }
         case .corner:
@@ -392,8 +645,48 @@ final class Gestures {
     }
 
     private func cancel() {
-        if stepped { DispatchQueue.main.async { Cursor.release() } }
+        if stepped || barShown { DispatchQueue.main.async { Cursor.release() } }
         stepped = false
+        if barShown { hideBar() }
+    }
+
+    // MARK: Click swallowing
+
+    // Called by the click event tap on the main thread. Returns true to drop the click,
+    // so tapping or pressing on the bar or the mute corner doesn't also click whatever
+    // is under the cursor.
+    func shouldSwallow(_ type: CGEventType) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        switch type {
+        case .leftMouseDown:
+            swallowedDown = swallowDown(ProcessInfo.processInfo.systemUptime)
+            return swallowedDown
+        case .leftMouseDragged:
+            return swallowedDown
+        case .leftMouseUp:
+            defer { swallowedDown = false }
+            return swallowedDown
+        default:
+            return false
+        }
+    }
+
+    private func swallowDown(_ now: Double) -> Bool {
+        if phase == .tracking && zone == .top && settings.touchBar {
+            guard barShown else {
+                // A real click before the bar appears is just a click.
+                phase = .ignoring
+                return false
+            }
+            // Clicking while the bar is up presses the highlighted button.
+            if barSliderItem == nil && !barCancelling && !barFired && barIndex >= 0 {
+                barFired = true
+                fire((barFn ? FN_ITEMS : BAR_ITEMS)[barIndex])
+            }
+            return true
+        }
+        return now < swallowClicksUntil || now < cornerClickWindow
     }
 
     // MARK: Viewer feed (only while the viewer is open)
@@ -415,12 +708,213 @@ final class Gestures {
         }
         let snapshot = TouchSnapshot(
             dots: dots, zone: phase == .tracking ? zone : .none, ignoring: phase == .ignoring,
-            trackedID: fingerID, startPos: startPos, stepped: stepped)
+            trackedID: fingerID, startPos: startPos, stepped: stepped, barShown: barShown)
         DispatchQueue.main.async { viewer?.update(snapshot) }
     }
 }
 
 let gestures = Gestures()
+
+// MARK: - Click event tap
+
+var clickTap: CFMachPort?
+
+let clickTapCallback: CGEventTapCallBack = { _, type, event, _ in
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        if let clickTap { CGEvent.tapEnable(tap: clickTap, enable: true) }
+        return Unmanaged.passUnretained(event)
+    }
+    return gestures.shouldSwallow(type) ? nil : Unmanaged.passUnretained(event)
+}
+
+// Needs Accessibility permission; returns false until it's granted.
+func startClickTap() -> Bool {
+    let mask = (1 << CGEventType.leftMouseDown.rawValue)
+        | (1 << CGEventType.leftMouseUp.rawValue)
+        | (1 << CGEventType.leftMouseDragged.rawValue)
+    guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                      eventsOfInterest: CGEventMask(mask), callback: clickTapCallback,
+                                      userInfo: nil) else {
+        NSLog("Rimshot: couldn't create the click event tap (Accessibility not granted?)")
+        return false
+    }
+    clickTap = tap
+    let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+    CGEvent.tapEnable(tap: tap, enable: true)
+    NSLog("Rimshot: click event tap installed")
+    return true
+}
+
+// MARK: - Touch Bar overlay
+
+var touchBarHUD: TouchBarHUD?
+
+// A slim floating bar at the bottom of the screen, shown while a finger rests on the top edge.
+final class TouchBarHUD {
+    private let panel: NSPanel
+    private let barView = TouchBarView()
+    private var shown = false
+    private var generation = 0
+
+    init() {
+        panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 860, height: 60),
+                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        panel.isFloatingPanel = true
+        panel.level = .statusBar
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.ignoresMouseEvents = true
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+
+        let blur = NSVisualEffectView(frame: panel.contentRect(forFrameRect: panel.frame))
+        blur.material = .hudWindow
+        blur.blendingMode = .behindWindow
+        blur.state = .active
+        blur.wantsLayer = true
+        blur.layer?.cornerRadius = 16
+        blur.layer?.masksToBounds = true
+        barView.frame = blur.bounds
+        barView.autoresizingMask = [.width, .height]
+        blur.addSubview(barView)
+        panel.contentView = blur
+    }
+
+    func update(_ state: BarState) {
+        barView.state = state
+        barView.needsDisplay = true
+        if state.visible != shown {
+            shown = state.visible
+            if shown { show() } else { hide() }
+        }
+    }
+
+    private func show() {
+        generation += 1
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+        guard let area = screen?.visibleFrame else { return }
+        let width = min(860, area.width - 80)
+        panel.setFrame(NSRect(x: area.midX - width / 2, y: area.minY + 20, width: width, height: 60), display: true)
+        if !panel.isVisible {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            panel.animator().alphaValue = 1
+        }
+    }
+
+    private func hide() {
+        generation += 1
+        let current = generation
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self, self.generation == current else { return }
+            self.panel.orderOut(nil)
+        })
+    }
+}
+
+final class TouchBarView: NSView {
+    var state = BarState()
+
+    override func draw(_ dirtyRect: NSRect) {
+        let items = state.fn ? FN_ITEMS : BAR_ITEMS
+        let inner = bounds.insetBy(dx: 8, dy: 8)
+        if state.slider, items.indices.contains(state.index) {
+            drawSlider(items[state.index], in: inner)
+            return
+        }
+
+        let width = inner.width / CGFloat(items.count)
+        for (i, item) in items.enumerated() {
+            let r = NSRect(x: inner.minX + CGFloat(i) * width, y: inner.minY, width: width, height: inner.height)
+                .insetBy(dx: 3, dy: 0)
+            let selected = i == state.index && !state.cancelling
+            let shape = NSBezierPath(roundedRect: r, xRadius: 9, yRadius: 9)
+            (selected ? NSColor.controlAccentColor : NSColor.labelColor.withAlphaComponent(0.08)).setFill()
+            shape.fill()
+            if selected && state.charge > 0 {
+                // The hold fills the button from the bottom as it charges.
+                NSGraphicsContext.saveGraphicsState()
+                shape.addClip()
+                NSColor.white.withAlphaComponent(0.3).setFill()
+                NSRect(x: r.minX, y: r.minY, width: r.width, height: r.height * CGFloat(state.charge) / 10).fill()
+                NSGraphicsContext.restoreGraphicsState()
+            }
+            let color: NSColor = selected ? .white : NSColor.labelColor.withAlphaComponent(state.cancelling ? 0.3 : 0.85)
+            let caption: String? = !selected ? nil
+                : state.pressed ? "✓ done" : (item.isSlider ? "hold to adjust" : (state.charge > 0 ? "hold…" : nil))
+            drawContent(item, in: r, color: color, caption: caption)
+        }
+
+        if state.cancelling {
+            text("Release to cancel", at: NSPoint(x: bounds.midX, y: bounds.midY), size: 15,
+                 weight: .bold, color: .labelColor)
+        }
+    }
+
+    private func drawSlider(_ item: BarItem, in r: NSRect) {
+        NSColor.controlAccentColor.withAlphaComponent(0.25).setFill()
+        NSBezierPath(roundedRect: r, xRadius: 9, yRadius: 9).fill()
+
+        let left = NSRect(x: r.minX + 8, y: r.minY, width: 170, height: r.height)
+        if let symbol = item.symbol, let image = symbolImage(symbol, color: .labelColor) {
+            image.draw(in: NSRect(x: left.minX + 6, y: r.midY - image.size.height / 2,
+                                  width: image.size.width, height: image.size.height))
+        }
+        text(item.title, at: NSPoint(x: left.minX + 40, y: r.midY), size: 14, weight: .semibold,
+             color: .labelColor, alignLeft: true)
+
+        let track = NSRect(x: r.minX + 190, y: r.midY - 2, width: r.width - 290, height: 4)
+        text("◀", at: NSPoint(x: track.minX - 12, y: r.midY), size: 12, weight: .regular, color: .secondaryLabelColor)
+        text("▶", at: NSPoint(x: track.maxX + 12, y: r.midY), size: 12, weight: .regular, color: .secondaryLabelColor)
+        NSColor.labelColor.withAlphaComponent(0.25).setFill()
+        NSBezierPath(roundedRect: track, xRadius: 2, yRadius: 2).fill()
+        // The knob moves with the steps taken, a stand-in for the level macOS doesn't expose.
+        let offset = max(-1, min(1, CGFloat(state.steps) / 16))
+        let knobX = track.midX + offset * (track.width / 2)
+        NSColor.controlAccentColor.setFill()
+        NSBezierPath(ovalIn: NSRect(x: knobX - 8, y: r.midY - 8, width: 16, height: 16)).fill()
+
+        let steps = state.steps == 0 ? "0" : String(format: "%+d", state.steps)
+        text(steps, at: NSPoint(x: r.maxX - 40, y: r.midY), size: 14, weight: .semibold, color: .labelColor)
+    }
+
+    private func drawContent(_ item: BarItem, in r: NSRect, color: NSColor, caption: String?) {
+        let lift: CGFloat = caption == nil ? 0 : 6
+        if let symbol = item.symbol, let image = symbolImage(symbol, color: color) {
+            image.draw(in: NSRect(x: r.midX - image.size.width / 2, y: r.midY - image.size.height / 2 + lift,
+                                  width: image.size.width, height: image.size.height))
+        } else {
+            text(item.title, at: NSPoint(x: r.midX, y: r.midY + lift), size: 14, weight: .semibold, color: color)
+        }
+        if let caption {
+            text(caption, at: NSPoint(x: r.midX, y: r.minY + 8), size: 9, weight: .medium, color: color)
+        }
+    }
+
+    private func symbolImage(_ name: String, color: NSColor) -> NSImage? {
+        let config = NSImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+    }
+
+    private func text(_ string: String, at point: NSPoint, size: CGFloat, weight: NSFont.Weight,
+                      color: NSColor, alignLeft: Bool = false) {
+        let str = NSAttributedString(string: string, attributes: [
+            .font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color,
+        ])
+        let sz = str.size()
+        str.draw(at: NSPoint(x: alignLeft ? point.x : point.x - sz.width / 2, y: point.y - sz.height / 2))
+    }
+}
 
 // MARK: - Trackpad viewer (testing aid)
 
@@ -438,6 +932,7 @@ struct TouchSnapshot {
     var trackedID: Int32 = 0
     var startPos = MTPoint(x: 0, y: 0)
     var stepped = false
+    var barShown = false
 }
 
 var viewer: ViewerController?
@@ -533,9 +1028,29 @@ final class TrackpadView: NSView {
                  color: .tertiaryLabelColor, weight: .regular)
         }
 
-        // Top keyboard backlight strip.
+        // Top strip: Touch Bar or keyboard light slider.
         let top = rect(EDGE_WIDTH, 1 - EDGE_WIDTH, 1 - CORNER_SIZE, 1)
-        if s.topEdge {
+        if s.topEdge && s.touchBar {
+            fill(top, keyboardColor, alpha: snap.zone == .top ? 0.45 : 0.22)
+            text("TOUCH BAR  ·  rest, slide, lift", at: NSPoint(x: top.midX, y: top.midY),
+                 size: 10, color: keyboardColor)
+            // Where each button sits once the bar is up (it spans the full width).
+            let n = BAR_ITEMS.count
+            let labelY = 1 - EDGE_WIDTH - 0.035
+            for (i, item) in BAR_ITEMS.enumerated() {
+                let x = (Float(i) + 0.5) / Float(n)
+                text(item.short, at: point(MTPoint(x: x, y: labelY)), size: 9,
+                     color: keyboardColor.withAlphaComponent(0.8), weight: .medium)
+                if i > 0 {
+                    let bx = Float(i) / Float(n)
+                    let divider = NSBezierPath()
+                    divider.move(to: point(MTPoint(x: bx, y: labelY - 0.025)))
+                    divider.line(to: point(MTPoint(x: bx, y: 1 - EDGE_WIDTH)))
+                    keyboardColor.withAlphaComponent(0.35).setStroke()
+                    divider.stroke()
+                }
+            }
+        } else if s.topEdge {
             fill(top, keyboardColor, alpha: snap.zone == .top ? 0.45 : 0.22)
             text("◀ dimmer   ·   KEYBOARD LIGHT   ·   brighter ▶", at: NSPoint(x: top.midX, y: top.midY),
                  size: 10, color: keyboardColor)
@@ -579,7 +1094,11 @@ final class TrackpadView: NSView {
             }
         }
 
-        if snap.zone == .top {
+        if snap.zone == .top && s.touchBar {
+            let limit = snap.barShown ? 1 - BAR_CANCEL_DEPTH : snap.startPos.y - 2 * EDGE_WIDTH
+            dashedLine(from: point(MTPoint(x: 0, y: limit)), to: point(MTPoint(x: 1, y: limit)),
+                       color: .systemRed)
+        } else if snap.zone == .top {
             var k: Float = -60
             while k <= 60 {
                 let x = snap.startPos.x + k * TOP_STEP
@@ -676,7 +1195,7 @@ final class TrackpadView: NSView {
         case .right: return s.swapSides ? "right (brightness)" : "right (volume)"
         case .corner: return "corner (mute)"
         case .bottom: return "bottom (media)"
-        case .top: return "top (keyboard light)"
+        case .top: return s.touchBar ? "top (touch bar)" : "top (keyboard light)"
         case .none: return "none"
         }
     }
@@ -738,7 +1257,7 @@ final class ViewerController: NSObject, NSWindowDelegate {
 
         let toggles: [(String, String)] = [
             ("Swap Sides", "swapSides"), ("Bottom Quarter Only", "bottomQuarter"),
-            ("Haptics", "haptics"), ("Keyboard Light", "topEdge"),
+            ("Haptics", "haptics"), ("Top Edge", "topEdge"), ("Touch Bar", "touchBar"),
             ("Media Strip", "mediaStrip"), ("Tap to Play", "tapToPlay"),
         ]
         let row = NSStackView()
@@ -808,6 +1327,7 @@ final class ViewerController: NSObject, NSWindowDelegate {
         let d = UserDefaults.standard
         for (key, box) in boxes { box.state = d.bool(forKey: key) ? .on : .off }
         boxes["tapToPlay"]?.isEnabled = d.bool(forKey: "mediaStrip")
+        boxes["touchBar"]?.isEnabled = d.bool(forKey: "topEdge")
         padView.needsDisplay = true
     }
 }
@@ -845,6 +1365,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else {
             deviceCount = startMultitouch()
         }
+        touchBarHUD = TouchBarHUD()
+        _ = startClickTap()
         if CommandLine.arguments.contains("--viewer") { showViewer() }
     }
 
@@ -862,6 +1384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(disabled("No trackpad found"))
             menu.addItem(.separator())
         }
+        if clickTap == nil && AXIsProcessTrusted() { _ = startClickTap() }
         if !AXIsProcessTrusted() {
             menu.addItem(item("Grant Accessibility Access…", #selector(openAccessibility)))
             menu.addItem(.separator())
@@ -874,7 +1397,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(toggle("Swap Sides", key: "swapSides"))
         menu.addItem(toggle("Bottom Quarter Only", key: "bottomQuarter"))
         menu.addItem(toggle("Haptic Feedback", key: "haptics"))
-        menu.addItem(toggle("Keyboard Light (top edge)", key: "topEdge"))
+        menu.addItem(toggle("Top Edge", key: "topEdge"))
+        let bar = toggle("Touch Bar (off: keyboard light slider)", key: "touchBar")
+        bar.indentationLevel = 1
+        bar.isEnabled = d.bool(forKey: "topEdge")
+        menu.addItem(bar)
         menu.addItem(toggle("Media Strip", key: "mediaStrip"))
         let tap = toggle("Tap to Play", key: "tapToPlay")
         tap.indentationLevel = 1
