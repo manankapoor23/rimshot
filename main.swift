@@ -3,6 +3,8 @@
 
 import AppKit
 import ApplicationServices
+import AudioToolbox
+import CoreAudio
 import ServiceManagement
 
 // MARK: - Tuning constants (normalized trackpad units, 0...1)
@@ -129,6 +131,110 @@ enum MediaKeys {
     }
 }
 
+// MARK: - Current levels (so sliders stop at 0% and 100%)
+
+enum Levels {
+    // The current level, 0...1, for the slider whose "up" key is given, or nil if it can't be read.
+    static func read(upKey: Int32) -> Float? {
+        switch upKey {
+        case KEY_SOUND_UP: return volume()
+        case KEY_BRIGHTNESS_UP: return displayBrightness()
+        case KEY_ILLUMINATION_UP: return keyboardBrightness()
+        default: return nil
+        }
+    }
+
+    // CoreAudio: the default output device's main volume.
+    private static func volume() -> Float? {
+        var device = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr
+        else { return nil }
+        address = AudioObjectPropertyAddress(mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+                                             mScope: kAudioDevicePropertyScopeOutput,
+                                             mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectHasProperty(device, &address) else { return nil }
+        var value = Float32(0)
+        size = UInt32(MemoryLayout<Float32>.size)
+        return AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr ? value : nil
+    }
+
+    // DisplayServices (private): the built-in display's brightness.
+    private typealias GetBrightnessFn = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+    private static let getBrightness: GetBrightnessFn? = {
+        guard let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_NOW),
+              let symbol = dlsym(handle, "DisplayServicesGetBrightness") else { return nil }
+        return unsafeBitCast(symbol, to: GetBrightnessFn.self)
+    }()
+
+    private static func displayBrightness() -> Float? {
+        guard let getBrightness else { return nil }
+        var ids = [CGDirectDisplayID](repeating: 0, count: 16)
+        var count: UInt32 = 0
+        CGGetOnlineDisplayList(16, &ids, &count)
+        var display = CGMainDisplayID()
+        for id in ids.prefix(Int(count)) where CGDisplayIsBuiltin(id) != 0 { display = id; break }
+        var value: Float = 0
+        return getBrightness(display, &value) == 0 ? value : nil
+    }
+
+    // CoreBrightness (private): KeyboardBrightnessClient's level for the first backlit keyboard.
+    private typealias KeyboardLevelFn = @convention(c) (AnyObject, Selector, UInt64) -> Float
+    private static let keyboard: (client: NSObject, id: UInt64, level: KeyboardLevelFn)? = {
+        guard dlopen("/System/Library/PrivateFrameworks/CoreBrightness.framework/CoreBrightness", RTLD_NOW) != nil,
+              let type = NSClassFromString("KeyboardBrightnessClient") as? NSObject.Type else { return nil }
+        let client = type.init()
+        let idsSelector = NSSelectorFromString("copyKeyboardBacklightIDs")
+        let levelSelector = NSSelectorFromString("brightnessForKeyboard:")
+        guard client.responds(to: idsSelector), client.responds(to: levelSelector),
+              let ids = client.perform(idsSelector)?.takeRetainedValue() as? [NSNumber],
+              let first = ids.first else { return nil }
+        return (client, first.uint64Value, unsafeBitCast(client.method(for: levelSelector), to: KeyboardLevelFn.self))
+    }()
+
+    private static func keyboardBrightness() -> Float? {
+        guard let keyboard else { return nil }
+        return keyboard.level(keyboard.client, NSSelectorFromString("brightnessForKeyboard:"), keyboard.id)
+    }
+}
+
+// Where a slider sits in its range. Volume, brightness and keyboard light all move in 16 steps
+// (64 with ⇧⌥), so stepping snaps to that grid and stops at either end.
+struct SliderLimit {
+    private(set) var level: Float?   // 0...1 when the real level could be read
+    private(set) var units = 0       // otherwise, net movement in quarter steps, kept within ±64
+
+    init(level: Float? = nil) {
+        self.level = level.map { min(1, max(0, $0)) }
+    }
+
+    // Records one step and returns true, or returns false at the end of the range.
+    mutating func advance(up: Bool, fine: Bool, reread: () -> Float?) -> Bool {
+        let size: Float = fine ? 1.0 / 64 : 1.0 / 16
+        if var current = level {
+            if up ? current >= 0.999 : current <= 0.001 {
+                // The estimate says we're at the end; check the real level in case it drifted.
+                guard let real = reread(), up ? real < 0.999 : real > 0.001 else { return false }
+                current = real
+            }
+            let position = current / size
+            let next = up ? (position + 0.01).rounded(.down) + 1 : (position - 0.01).rounded(.up) - 1
+            level = min(1, max(0, next * size))
+            return true
+        }
+        let delta = fine ? 1 : 4
+        if up ? units + delta > 64 : units - delta < -64 { return false }
+        units += up ? delta : -delta
+        return true
+    }
+
+    // The level as a whole percentage, or -1 when it isn't known.
+    var percent: Int { level.map { Int(($0 * 100).rounded()) } ?? -1 }
+}
+
 // MARK: - Haptics and cursor (main thread only)
 
 enum Haptics {
@@ -141,6 +247,11 @@ enum Haptics {
         let pattern: NSHapticFeedbackManager.FeedbackPattern =
             step * 3 <= total ? .alignment : (step * 3 <= total * 2 ? .generic : .levelChange)
         NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
+    }
+
+    // A slider hit 0% or 100%.
+    static func edge() {
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
     }
 
     // The hold is complete: a firm double bump.
@@ -271,7 +382,8 @@ struct BarState: Equatable {
     var index = -1
     var slider = false
     var cancelling = false
-    var steps = 0
+    var level = -1          // the slider's real level in percent, or -1 if it can't be read
+    var steps = 0           // otherwise, quarter steps moved since the slider started
     var charge = 0          // 0...20, how far a hold has charged
     var pressed = false     // the button already fired during this touch
 }
@@ -307,7 +419,9 @@ final class Gestures {
     private var barHoldTicks = 0
     private var barCharge = 0
     private var barSliderItem: BarItem?
-    private var barSteps = 0
+    private var limit = SliderLimit()
+    private var limitReady = false
+    private var atLimit = false
     private var barCancelling = false
     private var barFired = false
     private var barState = BarState()
@@ -388,7 +502,8 @@ final class Gestures {
         barShown = false
         barIndex = -1
         barSliderItem = nil
-        barSteps = 0
+        limitReady = false
+        atLimit = false
         barCancelling = false
         barFired = false
         barHoldTicks = 0
@@ -443,11 +558,11 @@ final class Gestures {
         if let item = barSliderItem, case let .slider(upKey, downKey) = item.action {
             var dx = p.x - anchorX
             while dx >= TOP_STEP {
-                step(up: true, keys: (upKey, downKey, item.title)); barSteps += 1
+                step(up: true, keys: (upKey, downKey, item.title))
                 anchorX += TOP_STEP; dx -= TOP_STEP
             }
             while dx <= -TOP_STEP {
-                step(up: false, keys: (upKey, downKey, item.title)); barSteps -= 1
+                step(up: false, keys: (upKey, downKey, item.title))
                 anchorX -= TOP_STEP; dx += TOP_STEP
             }
             updateBar()
@@ -499,8 +614,8 @@ final class Gestures {
         if item.isSlider {
             barSliderItem = item
             anchorX = x
-            barSteps = 0
-            report("Touch Bar: adjusting \(item.title)")
+            if case let .slider(upKey, _) = item.action { startLimit(upKey: upKey) }
+            report("Touch Bar: adjusting \(item.title)\(limit.percent >= 0 ? " (\(limit.percent)%)" : "")")
         } else {
             barFired = true
             fire(item)
@@ -519,7 +634,8 @@ final class Gestures {
 
     private func updateBar() {
         let state = BarState(visible: barShown, fn: barFn, index: barIndex, slider: barSliderItem != nil,
-                             cancelling: barCancelling, steps: barSteps, charge: barCharge, pressed: barFired)
+                             cancelling: barCancelling, level: limit.percent, steps: limit.units,
+                             charge: barCharge, pressed: barFired)
         guard state != barState else { return }
         barState = state
         DispatchQueue.main.async { touchBarHUD?.update(state) }
@@ -531,20 +647,33 @@ final class Gestures {
         updateBar()
     }
 
+    private func startLimit(upKey: Int32) {
+        limit = SliderLimit(level: Levels.read(upKey: upKey))
+        limitReady = true
+        atLimit = false
+    }
+
     private func step(up: Bool, keys: (up: Int32, down: Int32, name: String)? = nil) {
         let first = !stepped
         stepped = true
-        let key: Int32
-        let name: String
-        if let keys {
-            key = up ? keys.up : keys.down
-            name = keys.name
-        } else {
-            key = up ? KEY_ILLUMINATION_UP : KEY_ILLUMINATION_DOWN
-            name = "Keyboard light"
-        }
+        let upKey = keys?.up ?? KEY_ILLUMINATION_UP
+        let key = up ? upKey : (keys?.down ?? KEY_ILLUMINATION_DOWN)
+        let name = keys?.name ?? "Keyboard light"
         let fine = CGEventSource.flagsState(.combinedSessionState).isSuperset(of: [.maskShift, .maskAlternate])
         let haptics = settings.haptics
+        if !limitReady { startLimit(upKey: upKey) }
+
+        // At 0% or 100%: no more key presses or ticks, just one bump when the edge is reached.
+        guard limit.advance(up: up, fine: fine, reread: { Levels.read(upKey: upKey) }) else {
+            if !atLimit {
+                atLimit = true
+                report("\(name) at \(up ? "maximum" : "minimum")")
+                DispatchQueue.main.async { if haptics { Haptics.edge() } }
+            }
+            if first { DispatchQueue.main.async { Cursor.freeze() } }
+            return
+        }
+        atLimit = false
         if DEBUG { NSLog("Rimshot: step %@ %@%@", name, up ? "up" : "down", fine ? " (fine)" : "") }
         report("\(name) \(up ? "▲" : "▼")\(fine ? "  (fine ¼ step)" : "")")
         DispatchQueue.main.async {
@@ -819,14 +948,27 @@ final class TouchBarView: NSView {
         text("▶", at: NSPoint(x: track.maxX + 12, y: r.midY), size: 12, weight: .regular, color: .secondaryLabelColor)
         NSColor.labelColor.withAlphaComponent(0.25).setFill()
         NSBezierPath(roundedRect: track, xRadius: 2, yRadius: 2).fill()
-        // The knob moves with the steps taken, a stand-in for the level macOS doesn't expose.
-        let offset = max(-1, min(1, CGFloat(state.steps) / 16))
-        let knobX = track.midX + offset * (track.width / 2)
+        // The knob shows the real level. If it couldn't be read, it shows how far the slider has
+        // moved from where it started, within one full range either way.
+        let fraction: CGFloat
+        let label: String
+        if state.level >= 0 {
+            fraction = CGFloat(state.level) / 100
+            label = "\(state.level)%"
+        } else {
+            fraction = 0.5 + CGFloat(state.steps) / 128
+            let steps = Double(state.steps) / 4
+            label = state.steps == 0 ? "0" : String(format: steps == steps.rounded() ? "%+.0f" : "%+.2f", steps)
+        }
+        let knobX = track.minX + fraction * track.width
         NSColor.controlAccentColor.setFill()
+        if state.level >= 0 {
+            NSBezierPath(roundedRect: NSRect(x: track.minX, y: track.minY, width: knobX - track.minX, height: track.height),
+                         xRadius: 2, yRadius: 2).fill()
+        }
         NSBezierPath(ovalIn: NSRect(x: knobX - 8, y: r.midY - 8, width: 16, height: 16)).fill()
 
-        let steps = state.steps == 0 ? "0" : String(format: "%+d", state.steps)
-        text(steps, at: NSPoint(x: r.maxX - 40, y: r.midY), size: 14, weight: .semibold, color: .labelColor)
+        text(label, at: NSPoint(x: r.maxX - 40, y: r.midY), size: 14, weight: .semibold, color: .labelColor)
     }
 
     private func drawContent(_ item: BarItem, in r: NSRect, color: NSColor, caption: String?) {

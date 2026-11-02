@@ -74,6 +74,7 @@ Posting these events requires Accessibility permission (`AXIsProcessTrustedWithO
 - Once the bar is up, the finger's x position across the **full trackpad width** picks a button (`BAR_ITEMS`, or `FN_ITEMS` while Fn/Globe is held). Each new button gets a haptic tick, and the cursor is frozen.
 - Lift fires the highlighted button. A physical click while the bar is up fires it immediately. Sliding below `1 − BAR_CANCEL_DEPTH` cancels.
 - Holding still (within `BAR_HOLD_MOVE`) charges the button. Haptics fire at the `BAR_CHARGE_TICKS` fractions of `BAR_HOLD`, getting closer together and moving from `.alignment` to `.generic` to `.levelChange`. While charging, the highlighted button shows a glow that grows from its center to its edges. A full charge plays a double `.levelChange` and fires the button, or turns a slider button into a slider driven by `TOP_STEP` of horizontal travel.
+- Sliders stop at 0% and 100%. When a slider starts, `Levels.read(upKey:)` gets the real level: volume from CoreAudio (`kAudioHardwareServiceDeviceProperty_VirtualMainVolume` on the default output device), display brightness from the private `DisplayServicesGetBrightness`, and keyboard light from the private `KeyboardBrightnessClient` in CoreBrightness. `SliderLimit` then tracks it in the keys' own steps (1/16, or 1/64 with ⇧⌥), refuses steps past either end (one `.levelChange` bump, no key press, no tick), and re-reads the real level before refusing in case its estimate drifted. If a level can't be read, it falls back to allowing one full range of movement either way.
 - The overlay is a borderless, non-activating `NSPanel` (`TouchBarHUD`) that ignores the mouse. It's updated from `Gestures` only when its `BarState` changes.
 - Buttons are `BarItem`s with a `BarAction`: a virtual key code, a media key, an app to open, or a slider. Mission Control and Screenshot open their apps in `/System/Applications`.
 
@@ -141,6 +142,7 @@ Every rebuild changes the ad-hoc signature, so macOS may silently stop trusting 
 - [ ] Holding a button charges with quickening haptics and a center-out glow, then fires it
 - [ ] Shift+Option while dragging a bar slider gives quarter steps
 - [ ] Holding Brightness, Keyboard Light or Volume turns it into a working slider
+- [ ] A slider starts at the real level (shown in %), stops at 0% and 100% with one bump, and sends no keys past the end
 - [ ] Holding Fn/Globe shows esc and F1–F12, and they send the right keys
 - [ ] Sliding down cancels without pressing anything
 - [ ] Taps and presses on the bar never click whatever is under the cursor
