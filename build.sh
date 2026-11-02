@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="Rimshot.app"
-VERSION="0.1.0"
+VERSION="0.1.1"
 
 rm -rf "$APP" build
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" build
